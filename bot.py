@@ -252,7 +252,7 @@ async def update_trending(trending_threads, last_forums_update):
 			await client.log(f'Failed to parse forums at {now.strftime(time_format)}')
 			trending_threads = backup
 
-		await asyncio.sleep(3600)
+		await asyncio.sleep(3600 * 2)
 
 # ! -------------- !
 
@@ -630,18 +630,18 @@ class Bot(discord.Client):
 		
 		async def page(page_num):
 			query = 'query UserHistory($id: String, $type: String, $limit: Int, $skip: Int) { userHistory(id: $id, type: $type, limit: $limit, skip: $skip) { auctions { id seller itemData { texture id name tag quantity lore __typename } bids { bidder timestamp amount __typename } highestBidAmount end __typename } __typename } }'
-            
-            json = {
-                'operationName': 'UserHistory',
+			
+			json = {
+				'operationName': 'UserHistory',
 				'variables': {
 					'id': uuid,
 					'limit': page_size,
 					'skip': page_num * page_size,
-                    'type': 'auctions'
-                }
-                'query': query
-            }
-                
+					'type': 'auctions'
+				}
+				'query': query
+			}
+				
 			r = requests.post(f'https://craftlink.xyz/graphql', json=json)
 			r.raise_for_status()
 			r = r.json()['data']['userHistory']['auctions']
@@ -659,14 +659,14 @@ class Bot(discord.Client):
 			
 			if r:
 				for auction in r:
-                    buyer = await skypy.get_uname(auction['bids'][0]['bidder'])
-                    
+					buyer = await skypy.get_uname(auction['bids'][0]['bidder'])
+					
 					item = auction['itemData']
 					embed.add_field(
 						name = f'{item["quantity"]}x {item["name"].upper()}',
 						value = f'```diff\n! {int(auction["highestBidAmount"]):,} coins\n'
 						f'-sold to {buyer}\n'
-                        f'{datetime.fromtimestamp(int(auction["end"]) // 1000).strftime(time_format)}```'
+						f'{datetime.fromtimestamp(int(auction["end"]) // 1000).strftime(time_format)}```'
 					)
 			else:
 				embed.add_field(name=None, value='```¯\_(ツ)_/¯```')
@@ -747,7 +747,7 @@ class Bot(discord.Client):
 						name = f'{item["quantity"]}x {item["name"].upper()}',
 						value = f'```diff\n! {int(auction["highestBidAmount"]):,} coins\n'
 						f'-by {await skypy.get_uname(auction["seller"])}\n'
-                        f'{datetime.fromtimestamp(int(auction["end"]) // 1000).strftime(time_format)}```'
+						f'{datetime.fromtimestamp(int(auction["end"]) // 1000).strftime(time_format)}```'
 					)
 			else:
 				embed.add_field(name=None, value='```¯\_(ツ)_/¯```')
