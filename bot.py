@@ -666,7 +666,7 @@ class Bot(discord.Client):
 					item = auction['itemData']
 					embed.add_field(
 						name = f'{item["quantity"]}x {item["name"].upper()}',
-						value = f'```diff\n! {auction["highestBidAmount"]:,} coins\n'
+						value = f'```diff\n! {int(auction["highestBidAmount"]):,} coins\n'
 						f'{datetime.fromtimestamp(int(auction["end"]) // 1000).strftime(time_format)}\n'
 						f'- Sold by {await skypy.get_uname(auction["seller"])}```'
 					)
