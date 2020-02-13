@@ -638,7 +638,7 @@ class Bot(discord.Client):
 					'limit': page_size,
 					'skip': page_num * page_size,
 					'type': 'auctions'
-				}
+				},
 				'query': query
 			}
 				
