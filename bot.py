@@ -613,10 +613,90 @@ class Bot(discord.Client):
 		await self.unimplemented(message)
 		
 	async def sells(self, message, *args):
-		await self.unimplemented(message)
+		page_size = 12
+		
+		user = message.author
+		channel = message.channel
+		
+		if not args:
+			await self.no_args('sells', user, channel)
+			return
+			
+		name = args[0]
+		try:
+			uuid = await skypy.get_uuid(name)
+		except skypy.BadNameError:
+			await channel.send(f'{user.mention} invalid username!')
+		
+		async def page(page_num):
+			query = 'query UserHistory($id: String, $type: String, $limit: Int, $skip: Int) { userHistory(id: $id, type: $type, limit: $limit, skip: $skip) { auctions { id seller itemData { texture id name tag quantity lore __typename } bids { bidder timestamp amount __typename } highestBidAmount end __typename } __typename } }'
+            
+            json = {
+                'operationName': 'UserHistory',
+				'variables': {
+					'id': uuid,
+					'limit': page_size,
+					'skip': page_num * page_size,
+                    'type': 'auctions'
+                }
+                'query': query
+            }
+                
+			r = requests.post(f'https://craftlink.xyz/graphql', json=json)
+			r.raise_for_status()
+			r = r.json()['data']['userHistory']['auctions']
+			
+			if len(r) < page_size:
+				last_page = True
+			else:
+				last_page = False
+			
+			embed = Embed(
+				channel,
+				title=f'Past Auctions From {name}',
+				description=f'Page {page_num + 1} | Powered by craftlink.xyz!'
+			)
+			
+			if r:
+				for auction in r:
+                    buyer = await skypy.get_uname(auction['bids'][0]['bidder'])
+                    
+					item = auction['itemData']
+					embed.add_field(
+						name = f'{item["quantity"]}x {item["name"].upper()}',
+						value = f'```diff\n! {int(auction["highestBidAmount"]):,} coins\n'
+						f'-sold to {buyer}\n'
+                        f'{datetime.fromtimestamp(int(auction["end"]) // 1000).strftime(time_format)}```'
+					)
+			else:
+				embed.add_field(name=None, value='```¯\_(ツ)_/¯```')
+				
+			return (embed, last_page)
+				
+		page_num = 0
+		backward = {'⬅️': -1}
+		forward = {'➡️': 1}
+		both = {'⬅️': -1, '➡️': 1}
+		embed, last_page = await page(page_num)
+		msg = await embed.send()
+		
+		while True:
+			if page_num == 0 and last_page is True:
+				return
+			elif page_num == 0:
+				result = await self.reaction_menu(msg, user, forward)
+			elif last_page is True:
+				result = await self.reaction_menu(msg, user, backward)
+			else:
+				result = await self.reaction_menu(msg, user, both)
+			if result is None:
+				break
+			page_num += result
+			embed, last_page = await page(page_num)
+			await msg.edit(embed=embed)
 		
 	async def buys(self, message, *args):
-		page_size = 15
+		page_size = 12
 		
 		user = message.author
 		channel = message.channel
@@ -666,8 +746,8 @@ class Bot(discord.Client):
 					embed.add_field(
 						name = f'{item["quantity"]}x {item["name"].upper()}',
 						value = f'```diff\n! {int(auction["highestBidAmount"]):,} coins\n'
-						f'{datetime.fromtimestamp(int(auction["end"]) // 1000).strftime(time_format)}\n'
-						f'- Sold by {await skypy.get_uname(auction["seller"])}```'
+						f'-by {await skypy.get_uname(auction["seller"])}\n'
+                        f'{datetime.fromtimestamp(int(auction["end"]) // 1000).strftime(time_format)}```'
 					)
 			else:
 				embed.add_field(name=None, value='```¯\_(ツ)_/¯```')
@@ -1089,7 +1169,7 @@ class Bot(discord.Client):
 				if await self.back(await box.send(), user) is False:
 					return
 		except discord.errors.Forbidden:
-			await channel.send('f{user.mention} your DM\'s are turned off')
+			await channel.send(f'{user.mention} your DM\'s are turned off')
 
 	async def stats(self, message, *args):
 		channel = message.channel
