@@ -631,7 +631,6 @@ class Bot(discord.Client):
 		except skypy.BadNameError:
 			await channel.send(f'{user.mention} invalid username!')
 		
-		last_page = False
 		async def page(page_num):
 			query = 'query UserHistory($id: String, $type: String, $limit: Int, $skip: Int) {userHistory(id: $id, type: $type, limit: $limit, skip: $skip) {auctions {id seller itemData {texture id name tag quantity lore __typename} bids {bidder timestamp amount __typename} highestBidAmount end __typename} __typename}}'
 
@@ -671,7 +670,7 @@ class Bot(discord.Client):
 						f'- Sold by {await skypy.get_uname(auction["seller"])}```'
 					)
 			else:
-				embed.add_field(name = None, value = '```¯\_(ツ)_/¯```')
+				embed.add_field(name=None, value='```¯\_(ツ)_/¯```')
 				
 			return (embed, last_page)
 				
@@ -679,10 +678,10 @@ class Bot(discord.Client):
 		backward = {'⬅️': -1}
 		forward = {'➡️': 1}
 		both = {'⬅️': -1, '➡️': 1}
-		
+        embed, last_page = await page(page_num)
+        msg = await embed.send()
+        
 		while True:
-			embed, last_page = await page(page_num)
-			msg = await embed.send()
 			if page_num == 0 and last_page is True:
 				return
 			elif page_num == 0:
@@ -693,8 +692,9 @@ class Bot(discord.Client):
 				result = await self.reaction_menu(msg, user, both)
 			if result is None:
 				break
-			await msg.delete()
-			page_num += result
+            page_num += result
+            embed, last_page = await page(page_num)
+			await msg.edit(embed=embed)
 	
 	async def player(self, message, *args):
 		user = message.author
@@ -1195,6 +1195,8 @@ class Bot(discord.Client):
 		return msg
 
 	async def reaction_menu(self, message, user, reactions):
+        await message.clear_reactions()
+    
 		for reaction in reactions.keys():
 			await message.add_reaction(reaction)
 
