@@ -678,9 +678,9 @@ class Bot(discord.Client):
 		backward = {'⬅️': -1}
 		forward = {'➡️': 1}
 		both = {'⬅️': -1, '➡️': 1}
-        embed, last_page = await page(page_num)
-        msg = await embed.send()
-        
+		embed, last_page = await page(page_num)
+		msg = await embed.send()
+		
 		while True:
 			if page_num == 0 and last_page is True:
 				return
@@ -692,8 +692,8 @@ class Bot(discord.Client):
 				result = await self.reaction_menu(msg, user, both)
 			if result is None:
 				break
-            page_num += result
-            embed, last_page = await page(page_num)
+			page_num += result
+			embed, last_page = await page(page_num)
 			await msg.edit(embed=embed)
 	
 	async def player(self, message, *args):
@@ -1195,8 +1195,8 @@ class Bot(discord.Client):
 		return msg
 
 	async def reaction_menu(self, message, user, reactions):
-        await message.clear_reactions()
-    
+		await message.clear_reactions()
+	
 		for reaction in reactions.keys():
 			await message.add_reaction(reaction)
 
