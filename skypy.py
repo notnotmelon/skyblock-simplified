@@ -539,7 +539,10 @@ class Player(ApiInterface):
 			self.collections = {}
 		self.unlocked_collections = parse_collections('unlocked_coll_tiers')
 		self.minions = parse_collections('crafted_generators')
-		self.unique_minions = self.achievements.get('skyblock_minion_lover', 0)
+		self.unique_minions = max(
+			self.achievements.get('skyblock_minion_lover', 0),
+			sum(self.minions.values())
+		)
 
 		for slots, req in enumerate(minion_slot_requirements):
 			if self.unique_minions < req:
