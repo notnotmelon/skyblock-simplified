@@ -186,8 +186,6 @@ trending_timeout = 24
 trending_algorithm = lambda thread: (thread['views'] + thread['likes'] * 200) / math.sqrt(thread['date'] / 1000 + 1)
 
 async def update_trending(trending_threads, last_forums_update):
-	await client.wait_until_ready()
-
 	class Timeout(Exception):
 		pass
 
@@ -236,7 +234,7 @@ async def update_trending(trending_threads, last_forums_update):
 					if discord.utils.find(lambda t: thread['link'] == t['link'], trending_threads) is None:
 						trending_threads.append(thread)
 						trending_threads.sort(key=trending_algorithm, reverse=True)
-						trending_threads = trending_threads[0:num_trending]
+						del trending_threads[num_trending:]
 				pagenumber += 1
 
 		except Timeout:
@@ -331,16 +329,16 @@ ranks = [
 	['PC', 'NINTENDO', 'PLAY STATION', 'XBOX', 'VR', 'MOBILE']
 ]
 
-top_players = {name: ValueSortedDict(lambda player_tuple: -player_tuple[0]) for name in leaderboards.keys()}
+top_players = {name: ValueSortedDict(lambda player_tuple: -player_tuple[1]) for name in leaderboards.keys()}
 
 def update_top_players(player):
 	for skill, players in top_players.items():
 		lb = leaderboards[skill]
 		own = lb[1](player)
 		if lb[2]:
-			players[player.uname] = (own, lb[2](player))
+			players[player.uuid] = (player.uname, own, lb[2](player))
 		else:
-			players[player.uname] = (own,)
+			players[player.uuid] = (player.uname, own)
 
 close_message = '\n> _use **exit** to close the session_'
 args_message = '`[] signifies a required argument, while () signifies an optional argument`'
@@ -538,7 +536,7 @@ class Bot(discord.Client):
 			await channel.send(f'{user.mention} you do not have permission to use this command here! Try using it on your own discord server')
 			return
 			
-		await self.log(f'{user.name} used {name} in {"a DM" if dm else channel.guild.name}')
+		await self.log(f'{user.name} used {name} {args} in {"a DM" if dm else channel.guild.name}')
 		if session:
 			self.hot_channels[channel] = user
 			
@@ -577,12 +575,12 @@ class Bot(discord.Client):
 			players = []
 			top = top_players[name]
 			if optional_function:
-				for i in range(50):
-					name, (data, optional) = top.peekitem(i)
+				for i in range(min(50, len(top))):
+					uuid, (name, data, optional) = top.peekitem(i)
 					players.append(f'#{str(i + 1).ljust(2)} {name} [{round(optional, 3)}] [{round(data, 3):,}]')
 			else:
-				for i in range(50):
-					name, (data,) = top.peekitem(i)
+				for i in range(min(50, len(top))):
+					uuid, (name, data) = top.peekitem(i)
 					players.append(f'#{str(i + 1).ljust(2)} {name} [{round(data, 3):,}]')
 			
 			portion = len(players) / 30
@@ -610,7 +608,34 @@ class Bot(discord.Client):
 			await msg.delete()
 
 	async def price(self, message, *args):
-		await self.unimplemented(message)
+		'''
+		user = message.author
+		channel = message.channel
+		
+		if not args:
+			self.args_message('price', user, channel)
+	
+		query = 'query Item($name: String) { item(name: $name) { id hourlyPrices { priceData { enchantments { name value } runes { name value } average averageFiltered median saleVolume accurate } averageAnvilUses averageRuneCount averageEnchantmentCount averageHotPotatoCount averageQuantity saleVolume timestamp } } } '
+		
+		json = {
+			'operationName': 'Item',
+			'variables': {'name': ' '.join(args).capitalize()},
+			'query': query
+		}
+		
+		r = requests.post(f'https://craftlink.xyz/graphql', json=json)
+		r.raise_for_status()
+		r = r.json()['data']['item']['hourlyPrices']
+		
+		auctions = []
+		potatoes = 0
+		for hour in r:
+			auctions.extend(hour['priceData'])
+			potatoes += hour['averageHotPotatoCount']
+			
+		auctions.sort(key=lambda auction: auction['average'])
+		median = auctions[len(auctions) / 2]
+		'''
 		
 	async def sells(self, message, *args):
 		page_size = 12
@@ -627,8 +652,8 @@ class Bot(discord.Client):
 			uuid = await skypy.get_uuid(name)
 		except skypy.BadNameError:
 			await channel.send(f'{user.mention} invalid username!')
-		
-		async def page(page_num):
+			
+		async def pages(page_num):
 			query = 'query UserHistory($id: String, $type: String, $limit: Int, $skip: Int) { userHistory(id: $id, type: $type, limit: $limit, skip: $skip) { auctions { id seller itemData { texture id name tag quantity lore __typename } bids { bidder timestamp amount __typename } highestBidAmount end __typename } __typename } }'
 			
 			json = {
@@ -672,28 +697,8 @@ class Bot(discord.Client):
 				embed.add_field(name=None, value='```¯\_(ツ)_/¯```')
 				
 			return (embed, last_page)
-				
-		page_num = 0
-		backward = {'⬅️': -1}
-		forward = {'➡️': 1}
-		both = {'⬅️': -1, '➡️': 1}
-		embed, last_page = await page(page_num)
-		msg = await embed.send()
-		
-		while True:
-			if page_num == 0 and last_page is True:
-				return
-			elif page_num == 0:
-				result = await self.reaction_menu(msg, user, forward)
-			elif last_page is True:
-				result = await self.reaction_menu(msg, user, backward)
-			else:
-				result = await self.reaction_menu(msg, user, both)
-			if result is None:
-				break
-			page_num += result
-			embed, last_page = await page(page_num)
-			await msg.edit(embed=embed)
+			
+		await self.book(user, channel, pages)
 		
 	async def buys(self, message, *args):
 		page_size = 12
@@ -704,14 +709,14 @@ class Bot(discord.Client):
 		if not args:
 			await self.no_args('buys', user, channel)
 			return
-			
+		
 		name = args[0]
 		try:
 			uuid = await skypy.get_uuid(name)
 		except skypy.BadNameError:
 			await channel.send(f'{user.mention} invalid username!')
 		
-		async def page(page_num):
+		async def pages(page_num):
 			query = 'query UserHistory($id: String, $type: String, $limit: Int, $skip: Int) {userHistory(id: $id, type: $type, limit: $limit, skip: $skip) {auctions {id seller itemData {texture id name tag quantity lore __typename} bids {bidder timestamp amount __typename} highestBidAmount end __typename} __typename}}'
 
 			json = {
@@ -751,30 +756,10 @@ class Bot(discord.Client):
 					)
 			else:
 				embed.add_field(name=None, value='```¯\_(ツ)_/¯```')
-				
+			
 			return (embed, last_page)
-				
-		page_num = 0
-		backward = {'⬅️': -1}
-		forward = {'➡️': 1}
-		both = {'⬅️': -1, '➡️': 1}
-		embed, last_page = await page(page_num)
-		msg = await embed.send()
-		
-		while True:
-			if page_num == 0 and last_page is True:
-				return
-			elif page_num == 0:
-				result = await self.reaction_menu(msg, user, forward)
-			elif last_page is True:
-				result = await self.reaction_menu(msg, user, backward)
-			else:
-				result = await self.reaction_menu(msg, user, both)
-			if result is None:
-				break
-			page_num += result
-			embed, last_page = await page(page_num)
-			await msg.edit(embed=embed)
+			
+		await self.book(user, channel, pages)
 	
 	async def player(self, message, *args):
 		user = message.author
@@ -794,7 +779,6 @@ class Bot(discord.Client):
 			await player.set_profile_automatically()
 		else:
 			try:
-				await player.set_profile(player.profiles[args[1].capitalize()])
 				await player.set_profile(player.profiles[args[1].capitalize()])
 			except KeyError:
 				await channel.send(f'{user.mention} invalid profile!')
@@ -1161,15 +1145,18 @@ class Bot(discord.Client):
 			)
 
 		
-		try:
-			while True:
-				box = await self.reaction_menu(await embed.send(), user, boxes)
-				if box is None:
-					return
-				if await self.back(await box.send(), user) is False:
-					return
-		except discord.errors.Forbidden:
-			await channel.send(f'{user.mention} your DM\'s are turned off')
+		while True:
+			try:
+				msg = await embed.send()
+			except discord.errors.Forbidden:
+				await channel.send(f'{user.mention} your DM\'s are turned off')
+				
+			box = await self.reaction_menu(msg, user, boxes)
+			if box is None:
+				return
+			if await self.back(await box.send(), user) is False:
+				return
+		
 
 	async def stats(self, message, *args):
 		channel = message.channel
@@ -1274,8 +1261,9 @@ class Bot(discord.Client):
 
 		return msg
 
-	async def reaction_menu(self, message, user, reactions):
-		await message.clear_reactions()
+	async def reaction_menu(self, message, user, reactions, edit=False):
+		if edit:
+			await message.clear_reactions()
 	
 		for reaction in reactions.keys():
 			await message.add_reaction(reaction)
@@ -1294,6 +1282,46 @@ class Bot(discord.Client):
 			
 	async def back(self, message, user):
 		return True if await self.reaction_menu(message, user, {'⬅️': True}) else False
+		
+	async def book(self, user, channel, pages):
+		page_num = 0
+		backward = {'⬅️': -1}
+		forward = {'➡️': 1}
+		both = {'⬅️': -1, '➡️': 1}
+	
+		if user.dm_channel != channel and channel.guild.me.permissions_in(channel).manage_messages:
+			embed, last_page = await pages(page_num)
+			msg = await embed.send()
+			while True:
+				if page_num == 0 and last_page is True:
+					return
+				elif page_num == 0:
+					result = await self.reaction_menu(msg, user, forward, edit=True)
+				elif last_page is True:
+					result = await self.reaction_menu(msg, user, backward, edit=True)
+				else:
+					result = await self.reaction_menu(msg, user, both, edit=True)
+				if result is None:
+					break
+				page_num += result
+				embed, last_page = await pages(page_num)
+				await msg.edit(embed=embed)
+		else:
+			while True:
+				embed, last_page = await pages(page_num)
+				msg = await embed.send()
+				if page_num == 0 and last_page is True:
+					return
+				elif page_num == 0:
+					result = await self.reaction_menu(msg, user, forward, edit=False)
+				elif last_page is True:
+					result = await self.reaction_menu(msg, user, backward, edit=False)
+				else:
+					result = await self.reaction_menu(msg, user, both, edit=False)
+				if result is None:
+					break
+				await msg.delete()
+				page_num += result			
 
 client = Bot()
 client.loop.create_task(update_trending(trending_threads, last_forums_update))
