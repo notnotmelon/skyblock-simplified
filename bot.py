@@ -468,7 +468,7 @@ class Bot(discord.Client):
                         'desc': 'Displays all past purchases for any player'
                     },
                     'sells': {
-                        'args': '[username]',
+                        'args': '[username] (stacksize)',
                         'function': self.sells,
                         'desc': 'Displays all past purchases for any player'
                     }
@@ -630,7 +630,13 @@ class Bot(discord.Client):
         if not args:
             await self.no_args('price', user, channel)
             return
-        itemname = ' '.join(args).title()
+            
+        if len(args) > 1 and args[-1].isdigit():
+            stacksize = int(args[-1])
+            itemname = ' '.join(args[:-1]).title()
+        else:
+            stacksize = None
+            itemname = ' '.join(args).title()
         
         query = 'query ItemsList($page: Int, $items: Int, $name: String) { itemList(page: $page, items: $items, name: $name) { page item { name id texture tag itemId __typename } __typename }}'
   
@@ -664,8 +670,9 @@ class Bot(discord.Client):
         if not r:
             await channel.send(f'{user.mention} there haven\'t been any `{itemname}` sold in the past day')
             return
-            
-        stacksize = max([int(item['itemData']['quantity']) for item in r])
+        
+        if not stacksize:
+            stacksize = max([int(item['itemData']['quantity']) for item in r])
         auctions = [int(item['highestBidAmount']) / int(item['itemData']['quantity']) * stacksize for item in r]
         
         size = len(auctions)
