@@ -321,7 +321,7 @@ levels = {
 ranks = [
     ['CAROLINA REAPER', 'GHOST PEPPER', 'HABAÑERO', 'JALAPEÑO', 'SWEET BANANA', 'BELL PEPPER'],
     ['WIZARD', 'KING', 'QUEEN', 'LORD', 'JESTER', 'PEASANT'],
-    ['PRESIDENT', 'GENERAL', 'MAJOR', 'SERGANT', 'COROPORAL', 'PRIVATE'],
+    ['PRESIDENT', 'GENERAL', 'MAJOR', 'SERGEANT', 'CORPORAL', 'PRIVATE'],
     ['S', 'A', 'B', 'C', 'D', 'F'],
     ['MVP++', 'MVP+', 'MVP', 'VIP+', 'VIP', 'NON'],
     ['DRAGON', 'DINOSAUR', 'GILA', 'TURTLE', 'SNAKE', 'GECKO'],
