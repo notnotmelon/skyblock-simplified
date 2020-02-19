@@ -611,7 +611,7 @@ class Bot(discord.Client):
 	def craftlink(self, query, *, operation, **kwargs):
 		json = {
 			'operationName': operation,
-			'variables': list(kwargs),
+			'variables': dict(kwargs),
 			'query': query
 		}
 		
