@@ -636,7 +636,7 @@ class Bot(discord.Client):
 			stacksize = 1
 			itemname = ' '.join(args).title()
 		
-		query = 'query ItemsList($page: Int, $items: Int, $name: String) { itemList(page: $page, items: $items, name: $name) { page item { name }}'		   
+		query = 'query ItemsList($page: Int, $items: Int, $name: String) { itemList(page: $page, items: $items, name: $name) { page item { name }}}'		   
 		r = self.craftlink(query, operation='ItemsList', name=itemname, items=1, page=1)['itemList']['item']
 		
 		if not r:
