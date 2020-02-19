@@ -647,7 +647,7 @@ class Bot(discord.Client):
 		query = 'query Item($name: String) { item(name: $name) { sales { price }}}'
 		r = self.craftlink(query, operation='Item', name=itemname)['item']['sales']
 			
-		auctions = [int(item['price']) * stacksize for item in r]
+		auctions = [float(item['price']) * stacksize for item in r]
 		
 		size = len(auctions)
 		avg = mean(auctions)
