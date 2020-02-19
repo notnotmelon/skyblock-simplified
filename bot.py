@@ -344,6 +344,8 @@ def update_top_players(player):
 close_message = '\n> _use **exit** to close the session_'
 args_message = '`[] signifies a required argument, while () signifies an optional argument`'
 
+whitelisted_servers = [int(server) for server in os.getenv('SERVERS').split()]
+
 class Bot(discord.Client):
 	def __init__(self, *args, **kwargs):
 		self.hot_channels = {}
@@ -524,6 +526,14 @@ class Bot(discord.Client):
 		if name not in self.callables:
 			return
 		
+		if not dm and not channel.guild.id in whitelisted_servers:
+			await Embed(
+				channel,
+				title='Donate 20$ to my PayPal to use Skyblock Simplified on this server',
+				description='https://www.paypal.com/pools/c/8mstSPhQNO'
+			).send()
+			return
+		
 		data = self.callables[name]
 		security = data['security'] if 'security' in data else 0
 		session = 'session' in data and data['session']
@@ -639,12 +649,12 @@ class Bot(discord.Client):
 		query = 'query ItemsList($page: Int, $items: Int, $name: String) { itemList(page: $page, items: $items, name: $name) { page item { name }}}'		   
 		r = self.craftlink(query, operation='ItemsList', name=itemname, items=1, page=1)['itemList']['item']
 		
-		if not r:
+		if len(r) == 0:
 			await channel.send(f'{user.mention} invalid itemname')
 			
 		itemname = r[0]['name']
 	
-		query = 'query Item($name: String) { item(name: $name) { sales { price }}}'
+		query = 'query Item($name: String) { item(name: $name) { sales { price } } }'
 		r = self.craftlink(query, operation='Item', name=itemname)['item']['sales']
 			
 		auctions = [float(item['price']) * stacksize for item in r]
