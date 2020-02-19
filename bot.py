@@ -1135,9 +1135,9 @@ class Bot(discord.Client):
 		embed = Embed(
 			dm,
 			title='Skyblock Simplified',
-			description='Welcome to Skyblock Simplified, a Skyblock bot designed to streamline gameplay\n'
+			description='Welcome to Skyblock Simplified, a Skyblock bot designed to streamline gameplay\nAdd to your server with https://tinyurl.com/add-sbs\n'
 			f'**React to this message with any of the emojis to view commands**\n{args_message}\n'
-		).set_footer(	
+		).set_footer(
 			text='Skyblock Simplified for Hypixel Skyblock | Created by notnotmelon#7218'
 		)
 
