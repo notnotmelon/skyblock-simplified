@@ -645,7 +645,7 @@ class Bot(discord.Client):
 		itemname = r[0]['name']
 	
 		query = 'query Item($name: String) { item(name: $name) { sales { price }}}'
-		r = self.craftlink(query, operation='Item', name=itemname)['itemList']['item']['sales']
+		r = self.craftlink(query, operation='Item', name=itemname)['item']['sales']
 			
 		auctions = [int(item['price']) * stacksize for item in r]
 		
