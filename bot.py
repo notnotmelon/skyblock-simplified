@@ -455,7 +455,7 @@ class Bot(discord.Client):
             },
             'auctions': {
                 'emoji': '💸',
-                'desc': 'View average prices for items aswell as past auctions for any player. Powered by craftlink.xyz!',
+                'desc': 'View average prices for items aswell as past auctions for any player. Powered by https://hypixel-skyblock.com',
                 'commands': {
                     'price': {
                         'args': '[itemname]',
@@ -637,7 +637,7 @@ class Bot(discord.Client):
             itemname = ' '.join(args).title()
         
         query = 'query ItemsList($page: Int, $items: Int, $name: String) { itemList(page: $page, items: $items, name: $name) { page item { name }}'        
-        r = craftlink(query, operation='ItemsList', name=itemname, items=1, page=1)['itemList']['item']
+        r = self.craftlink(query, operation='ItemsList', name=itemname, items=1, page=1)['itemList']['item']
         
         if not r:
             await channel.send(f'{user.mention} invalid itemname')
@@ -645,7 +645,7 @@ class Bot(discord.Client):
         itemname = r[0]['name']
     
         query = 'query Item($name: String) { item(name: $name) { sales { price }}}'
-        r = craftlink(query, operation='Item', name=itemname)['itemList']['item']['item']['sales']
+        r = self.craftlink(query, operation='Item', name=itemname)['itemList']['item']['sales']
 			
         auctions = [int(item['price']) * stacksize for item in r]
         
@@ -698,21 +698,7 @@ class Bot(discord.Client):
             
         async def pages(page_num):
             query = 'query UserHistory($id: String, $type: String, $limit: Int, $skip: Int) { userHistory(id: $id, type: $type, limit: $limit, skip: $skip) { auctions { id seller itemData { texture id name tag quantity lore __typename } bids { bidder timestamp amount __typename } highestBidAmount end __typename } __typename } }'
-            
-            json = {
-                'operationName': 'UserHistory',
-                'variables': {
-                    'id': uuid,
-                    'limit': page_size,
-                    'skip': page_num * page_size,
-                    'type': 'auctions'
-                },
-                'query': query
-            }
-                
-            r = requests.post(f'https://craftlink.xyz/graphql', json=json)
-            r.raise_for_status()
-            r = r.json()['data']['userHistory']['auctions']
+            r = self.craftlink(query, operation='UserHistory', id=uuid, limit=page_size, skip=page_num * page_size, type='auctions')['userHistory']['auctions']
             
             if len(r) < page_size:
                 last_page = True
@@ -761,21 +747,7 @@ class Bot(discord.Client):
         
         async def pages(page_num):
             query = 'query UserHistory($id: String, $type: String, $limit: Int, $skip: Int) {userHistory(id: $id, type: $type, limit: $limit, skip: $skip) {auctions {id seller itemData {texture id name tag quantity lore __typename} bids {bidder timestamp amount __typename} highestBidAmount end __typename} __typename}}'
-
-            json = {
-                'operationName': 'UserHistory',
-                'variables': {
-                    'id': uuid,
-                    'limit': page_size,
-                    'skip': page_num * page_size,
-                    'type': 'purchases'
-                },
-                'query': query
-            }
-
-            r = requests.post(f'https://craftlink.xyz/graphql', json=json)
-            r.raise_for_status()
-            r = r.json()['data']['userHistory']['auctions']
+			r = self.craftlink(query, operation='UserHistory', id=uuid, limit=page_size, skip=page_num * page_size, type='purchases')['userHistory']['auctions']
             
             if len(r) < page_size:
                 last_page = True
