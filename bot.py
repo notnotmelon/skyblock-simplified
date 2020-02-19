@@ -460,7 +460,7 @@ class Bot(discord.Client):
 				'desc': 'View average prices for items aswell as past auctions for any player. Powered by https://hypixel-skyblock.com',
 				'commands': {
 					'price': {
-						'args': '[itemname]',
+						'args': '[itemname] (stacksize)',
 						'function': self.price,
 						'desc': 'Displays the average price for any item'
 					},
@@ -470,7 +470,7 @@ class Bot(discord.Client):
 						'desc': 'Displays all past purchases for any player'
 					},
 					'sells': {
-						'args': '[username] (stacksize)',
+						'args': '[username]',
 						'function': self.sells,
 						'desc': 'Displays all past purchases for any player'
 					}
@@ -526,11 +526,13 @@ class Bot(discord.Client):
 		if name not in self.callables:
 			return
 		
-		if not dm and not channel.guild.id in whitelisted_servers:
+		if not dm and not channel.guild.id in whitelisted_servers and len(channel.guild.members) > 50:
 			await Embed(
 				channel,
 				title='Donate 20$ to my PayPal to use Skyblock Simplified on this server',
 				description='https://www.paypal.com/pools/c/8mstSPhQNO'
+			).set_footer(
+				text='Free for servers under 50 members'
 			).send()
 			return
 		
@@ -643,27 +645,32 @@ class Bot(discord.Client):
 			stacksize = int(args[-1])
 			itemname = ' '.join(args[:-1]).title()
 		else:
-			stacksize = 1
+			stacksize = None
 			itemname = ' '.join(args).title()
 		
 		query = 'query ItemsList($page: Int, $items: Int, $name: String) { itemList(page: $page, items: $items, name: $name) { page item { name }}}'		   
 		r = self.craftlink(query, operation='ItemsList', name=itemname, items=1, page=1)['itemList']['item']
 		
-		if len(r) == 0:
+		if not r:
 			await channel.send(f'{user.mention} invalid itemname')
+			return
 			
 		itemname = r[0]['name']
 	
-		query = 'query Item($name: String) { item(name: $name) { sales { price } } }'
-		r = self.craftlink(query, operation='Item', name=itemname)['item']['sales']
+		query = 'query Item($name: String) { item(name: $name) { sales { end price } recent { id seller itemData { quantity lore } bids { bidder timestamp amount } highestBidAmount end } }}'
+		r = self.craftlink(query, operation='Item', name=itemname)['item']
+		sales = r['sales']
 			
-		auctions = [float(item['price']) * stacksize for item in r]
+		if stacksize is None:
+			stacksize = 64 if max([int(auction['itemData']['quantity']) for auction in r['recent']]) > 32 else 1
+			
+		auctions = [float(item['price']) * stacksize for item in sales]
 		
 		size = len(auctions)
 		avg = mean(auctions)
 		std = pstdev(auctions, mu=avg)
 		
-		cutoff = std * 2
+		cutoff = std * 1.5
 		lower, upper = avg - cutoff, avg + cutoff
 		
 		steals = [a for a in auctions if a < lower]
@@ -672,7 +679,8 @@ class Bot(discord.Client):
 		try:
 			avg = mean(auctions)
 			mid = median(auctions)
-			std = pstdev(auctions, mu=avg)
+			small = min(auctions)
+			big = max(auctions)
 		except StatisticsError:
 			await channel.send(f'{user.mention} there haven\'t been any `{itemname}` sold recently')
 			return
@@ -685,8 +693,9 @@ class Bot(discord.Client):
 			name=None,
 			value=f'```Average: {round(avg):,}\nMedian: {round(mid):,}\nStandard Deviation: {round(std):,}```'
 			f'```There were {len(steals)} steals and {size} total sales```'
+			f'```The highest price was {math.celi(big):,} and the lowest was {math.ceil(small):,}```'
 		).set_footer(
-			text='Statistics are from the last 1500 items sold\nPrices are ignored unless they are within 2 standard deviations'
+			text='Statistics are from the last 1500 items sold\nPrices are ignored unless they are within 1.5 standard deviations'
 		).send()
 		
 	async def sells(self, message, *args):
