@@ -13,7 +13,7 @@ time_format = '%m/%d %I:%M %p UTC'
 import re
 import random
 from sortedcollections import ValueSortedDict
-from statistics import mean, median, pstdev
+from statistics import mean, median, pstdev, StatisticsError
 
 if os.environ.get('API_KEY') is None:
     import dotenv
@@ -608,8 +608,7 @@ class Bot(discord.Client):
                 break
             await msg.delete()
 
-    '''
-    def craftlink(self, operation, query, **kwargs):
+    def craftlink(self, query, *, operation, **kwargs):
         json = {
             'operationName': 'ItemsList',
             'variables': kwargs,
@@ -621,7 +620,6 @@ class Bot(discord.Client):
         r = r.json()
         
         return r['data']
-    '''
 
     async def price(self, message, *args):
         user = message.author
@@ -635,45 +633,21 @@ class Bot(discord.Client):
             stacksize = int(args[-1])
             itemname = ' '.join(args[:-1]).title()
         else:
-            stacksize = None
+            stacksize = 1
             itemname = ' '.join(args).title()
         
-        query = 'query ItemsList($page: Int, $items: Int, $name: String) { itemList(page: $page, items: $items, name: $name) { page item { name id texture tag itemId __typename } __typename }}'
-  
-        json = {
-            'operationName': 'ItemsList',
-            'variables': {'name': itemname, 'items': 1, 'limit': 1, 'page': 1},
-            'query': query
-        }
-        
-        r = requests.post(f'https://craftlink.xyz/graphql', json=json)
-        r.raise_for_status()
-        r = r.json()['data']['itemList']['item']
+        query = 'query ItemsList($page: Int, $items: Int, $name: String) { itemList(page: $page, items: $items, name: $name) { page item { name }}'        
+        r = craftlink(query, operation='ItemsList', name=itemname, items=1, page=1)['itemList']['item']
         
         if not r:
             await channel.send(f'{user.mention} invalid itemname')
             
         itemname = r[0]['name']
     
-        query = 'query Item($name: String) { item(name: $name) { sales { end price } recent { id seller itemData { quantity lore } bids { bidder timestamp amount } highestBidAmount end }}}'
-        
-        json = {
-            'operationName': 'Item',
-            'variables': {'name': itemname},
-            'query': query
-        }
-        
-        r = requests.post(f'https://craftlink.xyz/graphql', json=json)
-        r.raise_for_status()
-        r = r.json()['data']['item']['recent']
-        
-        if not r:
-            await channel.send(f'{user.mention} there haven\'t been any `{itemname}` sold in the past day')
-            return
-        
-        if not stacksize:
-            stacksize = max([int(item['itemData']['quantity']) for item in r])
-        auctions = [int(item['highestBidAmount']) / int(item['itemData']['quantity']) * stacksize for item in r]
+        query = 'query Item($name: String) { item(name: $name) { sales { price }}}'
+        r = craftlink(query, operation='Item', name=itemname)['itemList']['item']['item']['sales']
+			
+        auctions = [int(item['price']) * stacksize for item in r]
         
         size = len(auctions)
         avg = mean(auctions)
@@ -689,20 +663,20 @@ class Bot(discord.Client):
             avg = mean(auctions)
             mid = median(auctions)
             std = pstdev(auctions, mu=avg)
-        except :
-            await channel.send(f'{user.mention} there was some error with your request but melon was too lazy to find out what it was. just spell it better idk')
+        except StatisticsError:
+            await channel.send(f'{user.mention} there haven\'t been any `{itemname}` sold recently')
             return
             
         await Embed(
             channel,
             title=f'{itemname} (x{stacksize})',
-            description='Powered by craftlink.xyz!'
+            description='Powered by https://hypixel-skyblock.com'
         ).add_field(
             name=None,
             value=f'```Average: {round(avg):,}\nMedian: {round(mid):,}\nStandard Deviation: {round(std):,}```'
             f'```There were {len(steals)} steals and {size} total sales```'
         ).set_footer(
-            text='Stastics are from the last 24 hours\nPrices are ignored unless they are within 2 standard deviations'
+            text='Statistics are from the last 1500 items sold\nPrices are ignored unless they are within 2 standard deviations'
         ).send()
         
     async def sells(self, message, *args):
@@ -748,7 +722,7 @@ class Bot(discord.Client):
             embed = Embed(
                 channel,
                 title=f'Past Auctions From {name}',
-                description=f'Page {page_num + 1} | Powered by craftlink.xyz!'
+                description=f'Page {page_num + 1} | Powered by https://hypixel-skyblock.com'
             )
             
             if r:
@@ -811,7 +785,7 @@ class Bot(discord.Client):
             embed = Embed(
                 channel,
                 title=f'Past Purchases From {name}',
-                description=f'Page {page_num + 1} | Powered by craftlink.xyz!'
+                description=f'Page {page_num + 1} | Powered by https://hypixel-skyblock.com'
             )
             
             if r:
