@@ -707,10 +707,11 @@ class Player(ApiInterface):
 
 	def talisman_stats(self, include_reforges=True):
 		stats = {}
-		names = [tali.internal_name for tali in self.active_talismen]
-		for i in self.active_talismen:
-			for stat, amount in i.stats(include_reforges).items():
-				stats[stat] = stats.get(stat, 0) + amount
+		names = [tali.internal_name for tali in self.talismans if tali.active]
+		for i in self.talismans:
+			if i.active:
+				for stat, amount in i.stats(include_reforges).items():
+					stats[stat] = stats.get(stat, 0) + amount
 		return stats
 
 	def armor_stats(self, include_reforges=True):
@@ -771,7 +772,6 @@ class Player(ApiInterface):
 		apply_stats(self.cake_stats())
 		apply_stats(self.skill_stats())
 		apply_stats(self.talisman_stats(include_reforges=True))
-		apply_stats(weapon.stats())
 
 		stats = self.armor_modifiers(stats)
 
@@ -779,8 +779,9 @@ class Player(ApiInterface):
 
 	def talisman_counts(self):
 		counts = {'common': 0, 'uncommon': 0, 'rare': 0, 'epic': 0, 'legendary': 0}
-		for tali in self.active_talismen:
-			counts[tali.rarity] += 1
+		for tali in self.talismans:
+			if tali.active:
+				counts[tali.rarity] += 1
 		return counts
 
 	async def auctions(self):
