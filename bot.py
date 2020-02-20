@@ -13,7 +13,7 @@ time_format = '%m/%d %I:%M %p UTC'
 import re
 import random
 from sortedcollections import ValueSortedDict
-from statistics import mean, median, pstdev, StatisticsError
+from statistics import mean, median, mode, pstdev, StatisticsError
 
 if os.environ.get('API_KEY') is None:
 	import dotenv
@@ -21,27 +21,42 @@ if os.environ.get('API_KEY') is None:
 	
 keys = os.getenv('API_KEY').split()
 
-damaging_potions = [
-	{
-		'name': 'critical',
+damaging_potions = {
+	'critical': {
 		'stats': {
 			'crit chance': [0, 10, 15, 20, 25],
 			'crit damage': [0, 10, 20, 30, 40]
-		}
+		},
+		'levels': 4
 	},
-	{
-		'name': 'strength',
-		'stats': {'strength': [0, 5.25, 13.125, 21, 31.5, 42, 52.5, 63, 78.75]} # Assume cola
+	'strength': {
+		'stats': {'strength': [0, 5.25, 13.125, 21, 31.5, 42, 52.5, 63, 78.75]}, # Assume cola
+		'levels': 8
 	},
-	{
-		'name': 'spirit',
-		'stats': {'crit damage': [0, 10, 20, 30, 40]}
+	'spirit': {
+		'stats': {'crit damage': [0, 10, 20, 30, 40]},
+		'levels': 4
 	},
-	{
-		'name': 'archery',
-		'stats': {'enchantment modifier': [0, 17.5, 30, 55, 80]}
+	'archery': {
+		'stats': {'enchantment modifier': [0, 17.5, 30, 55, 80]},
+		'levels': 4
 	}
-]
+}
+
+orbs = {
+	'weird tuba': {
+		'internal': 'WEIRD_TUBA',
+		'stats': {'strength': 30}
+	},
+	'mana flux': {
+		'internal': 'MANA_FLUX_POWER_ORB',
+		'stats': {'strength': 10}
+	},
+	'overflux': {
+		'internal': 'OVERFLUX_POWER_ORB',
+		'stats': {'strength': 25}
+	}
+}
 
 # list of all enchantment powers per level. can be a function or a number
 enchantment_values = {
@@ -296,6 +311,47 @@ class Embed(discord.Embed):
 		
 discord.Embed = None
 
+class Route:
+	def __init__(self, talismans, rarity):
+		self.strength, self.crit_chance, self.crit_damage = [
+			sum(reforges_list[y][rarity][x] * talismans[y]
+				for y in range(len(reforges_list)) if reforges_list[y][rarity])
+			for x in range(3)
+		]
+		self.counts = talismans
+		self.rarity = rarity
+		self.rarity_str = ["common", "uncommon", "rare", "epic", "legendary"][self.rarity]
+
+	def __repr__(self):
+		return ', '.join([f'{c} '
+						  f'{"godly/zealous" if self.rarity < 2 and name == "godly" else name} '
+						  f'{rarity_grammar(self.rarity_str, c)}'
+						  for name, c in zip(relavant_reforges.keys(), self.counts) if c != 0])
+
+def routes(count, size, rarity):
+	def helper(count, idx, current):
+		if count == 0:
+			yield Route(current, rarity)
+		elif idx == size - 1:
+			new = current.copy()
+			new[idx] += count
+			yield Route(new, rarity)
+		else:
+			if reforges_list[idx][rarity]:
+				new = current.copy()
+				new[idx] += 1
+				for x in helper(count - 1, idx, new):
+					yield x
+			for x in helper(count, idx + 1, current):
+				yield x
+				
+	return helper(count, 0, [0] * size)
+
+def rarity_grammar(rarity, count=0):
+	if count == 1:
+		return rarity
+	return f'{rarity[:-1]}ies' if rarity[-1] == 'y' else f'{rarity}s'
+
 leaderboards = {
 	'Skill Average': ('📈', lambda player: player.skill_average, None, lambda guild: guild.stat_average('skill_average'), None),
 	'Minion Slots': ('⛓', lambda player: player.unique_minions, lambda player: player.minion_slots, lambda guild: guild.stat_average('unique_minions'), lambda guild: guild.stat_average('minion_slots')),
@@ -398,14 +454,9 @@ class Bot(discord.Client):
 						'session': True
 					},
 					'missing': {
+						'args': '[username] (profile)',
 						'function': self.view_missing_talismans,
-						'desc': 'Displays a list of missing talismans',
-						'session': True
-					},
-					'useless': {
-						'function': self.view_unnecessary_talismans,
-						'desc': 'Displays a list your overlapping talismans',
-						'session': True
+						'desc': 'Displays a list of your missing talismans. Also displays inactive/unnecessary talismans if you have them'
 					},
 					'damage': {
 						'function': self.calculate_damage,
@@ -669,18 +720,20 @@ class Bot(discord.Client):
 		size = len(auctions)
 		avg = mean(auctions)
 		std = pstdev(auctions, mu=avg)
+		small = min(auctions)
+		big = max(auctions)
 		
 		cutoff = std * 1.5
 		lower, upper = avg - cutoff, avg + cutoff
-		
-		steals = [a for a in auctions if a < lower]
 		auctions = [a for a in auctions if lower < a < upper]
 		
 		try:
 			avg = mean(auctions)
 			mid = median(auctions)
-			small = min(auctions)
-			big = max(auctions)
+			common = mode(auctions)
+			std = pstdev(auctions, mu=avg)			
+			cutoff = std * 1.5
+			steals = [a for a in auctions if a < avg - cutoff]
 		except StatisticsError:
 			await channel.send(f'{user.mention} there haven\'t been any `{itemname}` sold recently')
 			return
@@ -691,9 +744,8 @@ class Bot(discord.Client):
 			description='Powered by https://hypixel-skyblock.com'
 		).add_field(
 			name=None,
-			value=f'```Average: {round(avg):,}\nMedian: {round(mid):,}\nStandard Deviation: {round(std):,}```'
+			value=f'```Average: {round(avg):,}\nMedian: {round(mid):,}\nMode: {round(common):,}\nStandard Deviation: {round(std):,}\nMin: {math.ceil(small):,}\nMax: {math.ceil(big):,}```'
 			f'```There were {len(steals)} steals and {size} total sales```'
-			f'```The highest price was {math.celi(big):,} and the lowest was {math.ceil(small):,}```'
 		).set_footer(
 			text='Statistics are from the last 1500 items sold\nPrices are ignored unless they are within 1.5 standard deviations'
 		).send()
@@ -945,7 +997,238 @@ class Bot(discord.Client):
 				break
 
 	async def optimize_talismans(self, message, *args):
-		await self.unimplemented(message)
+		user = message.author
+		channel = message.channel
+	
+		valid = False
+
+		while valid is False:
+			await channel.send(f'{user.mention} what is your Minecraft username?')
+			msg = await self.respond(user, channel)
+			if msg is None:
+				return
+
+			msg = msg.content.lower()
+
+			try:
+				player = await skypy.Player(keys, uname=msg)
+				if len(player.profiles) == 0:
+					await channel.send(f'You have no profiles? Please report this{close_message}')
+
+				else:
+					valid = True
+
+			except skypy.NeverPlayedSkyblockError:
+				await channel.send(f'You have never played skyblock{close_message}')
+
+			except skypy.BadNameError:
+				await channel.send(f'Invalid username!{close_message}')
+
+		if len(player.profiles) == 1:
+			await player.set_profile(list(player.profiles.values())[0])
+
+		else:
+			embed = Embed(
+				channel,
+				title='Which profile do you want to use?',
+				description='Sorted by date created'
+			).add_field(
+				name=None,
+				value='\n\n'.join(player.profiles.keys())
+			)
+
+			valid = False
+
+			while valid is False:
+				await embed.send()
+
+				msg = await self.respond(user, channel)
+				if msg is None:
+					return
+				msg = msg.content.capitalize()
+
+				if msg in player.profiles:
+					await player.set_profile(player.profiles[msg])
+					valid = True
+
+				else:
+					await channel.send(f'Invalid profile! Did you make a typo?{close_message}')
+
+		if len(player.weapons) == 0:
+			await user.send(f'{user.mention} you have no weapons')
+			return
+		if len(player.weapons) == 1:
+			weapon = player.weapons[0]
+		else:
+			valid = False
+			
+			while valid is False:
+				await Embed(
+					channel,
+					title='Which weapon would you like to use?'
+				).set_footer(
+					text='You may use either the weapon name or the weapon number'
+				).add_field(
+					name=None,
+					value=''.join([f'```{i + 1} > ' + weapon.name + '```' for i, weapon in enumerate(player.weapons)])
+				).send()
+				
+				msg = await self.respond(user, channel)
+				if msg is None:
+					return
+				msg = msg.content.lower()
+				
+				names = [weapon.name.lower() for weapon in player.weapons]
+				
+				if msg in names:
+					weapon = player.weapons[names.index(msg)]
+					valid = True
+				else:
+					try:
+						weapon = player.weapons[int(msg) - 1]
+						valid = True
+					except (IndexError, TypeError, ValueError):
+						await channel.send(f'Invalid weapon! Did you make a typo?{close_message}')
+						
+		embed = Embed(
+			channel,
+			title='Is this the correct equipment?'
+		).add_field(
+			name='Weapon',
+			value=f'```{weapon.name}```',
+			inline=False
+		)
+		
+		for piece in ['helmet', 'chestplate', 'leggings', 'boots']:
+			embed.add_field(
+				name=piece.capitalize(),
+				value='```' + str(next((a.name for a in player.armor if a.type == piece), None)) + '```',
+				inline=False
+			)
+			
+		for name, amount in player.talisman_counts().items():
+			if amount:
+				embed.add_field(name=rarity_grammar(name).capitalize(), value=amount)
+		
+		if not await self.yesno(await embed.send(), user):
+			return
+		
+		numbers = ['0️⃣', '1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣', '🔟']
+		
+		stats = {'crit damage': 0, 'crit chance': 0, 'strength': 0, 'enchantment modifier': 0, 'damage': 0}
+		
+		for name, pot in damaging_potions.items():
+			buff = pot['stats']
+			levels = pot['levels']
+			
+			if weapon.type != 'bow' and name == 'archery':
+				continue
+				
+			msg = await channel.send(f'{user.mention} what level of `{name} potion` do you use?')
+			
+			emojis = {}
+			for x, number in enumerate(numbers[:levels + 1]):
+				emojis[number] = x
+				
+			level = await self.reaction_menu(msg, user, emojis)
+			if level is None:
+				return
+				
+			for name, amount in buff.items():
+				stats[name] += amount[level]
+				
+		for name, orb in orbs.items():
+			internal_name = orb['internal']
+			buff = orb['stats']
+			
+			if internal_name in player.inventory or internal_name in player.echest:
+				msg = await channel.send(f'{user.mention} will you be using your `{name}`?')
+				yn = await self.yesno(msg, user)
+				
+				if yn is None:
+					return
+				elif yn is True:
+					for name, amount in buff.items():
+						stats[name] += amount
+						
+		def apply_stats(additional):
+			for key, value in additional.items():
+				if key in stats:
+					stats[key] += value
+		
+		apply_stats(player.base_stats())
+		apply_stats(player.fairy_soul_stats())
+		apply_stats(player.armor_stats())
+		apply_stats(player.slayer_stats())
+		apply_stats(player.skill_stats())
+		apply_stats(player.talisman_stats(include_reforges=False))
+		apply_stats(weapon.stats())
+		weapon_damage = stats['damage']
+		
+		stat_modifiers = player.stat_modifiers()
+		str_mod = stat_modifiers.get('strength', lambda x: x)
+		cc_mod = stat_modifiers.get('crit chance', lambda x: x)
+		cd_mod = stat_modifiers.get('crit damage', lambda x, y: x)
+
+		base_str = stats['strength']
+		base_cc = stats['crit chance']
+		base_cd = stats['crit damage']
+
+		counts = player.talisman_counts()
+		
+		best = 0
+		best_route = []
+		best_str = 0
+		best_cc = 0
+		best_cd = 0
+	
+		if cc_mod(base_cc) <= 100:
+			cc_mod = stat_modifiers.get('crit chance', None)
+			if cc_mod:
+				for c, u, r, e, l in itertools.product(*[routes(counts[key], 4, rarity_num) for rarity_num, key in enumerate(counts.keys())]):
+					crit_chance = cc_mod(base_cc + c.crit_chance + u.crit_chance + r.crit_chance + e.crit_chance + l.crit_chance) // 1
+					if crit_chance >= 100:
+						strength = str_mod(base_str + c.strength + u.strength + r.strength + e.strength + l.strength)
+						crit_damage = cd_mod(base_cd + c.crit_damage + u.crit_damage + r.crit_damage + e.crit_damage + l.crit_damage, strength)
+
+						d = (5 + weapon_damage + strength // 5) * (1 + strength / 100) * (1 + crit_damage / 100)
+
+						if d > best:
+							best = d
+							best_route = [c, u, r, e, l]
+							best_str = strength
+							best_cc = crit_chance
+							best_cd = crit_damage
+			else:
+				for c, u, r, e, l in itertools.product(*[routes(counts[key], 4, rarity_num) for rarity_num, key in enumerate(counts.keys())]):
+					crit_chance = base_cc + c.crit_chance + u.crit_chance + r.crit_chance + e.crit_chance + l.crit_chance
+					if crit_chance >= 100:
+						strength = str_mod(base_str + c.strength + u.strength + r.strength + e.strength + l.strength)
+						crit_damage = cd_mod(base_cd + c.crit_damage + u.crit_damage + r.crit_damage + e.crit_damage + l.crit_damage, strength)
+
+						d = (5 + weapon_damage + strength // 5) * (1 + strength / 100) * (1 + crit_damage / 100)
+
+						if d > best:
+							best = d
+							best_route = [c, u, r, e, l]
+							best_str = strength
+							best_cc = 100
+							best_cd = crit_damage
+		else:
+			for c, u, r, e, l in itertools.product(*[routes(counts[key], 4, rarity_num) for rarity_num, key in enumerate(counts.keys())]):
+				strength = str_mod(base_str + c.strength + u.strength + r.strength + e.strength + l.strength)
+				crit_damage = cd_mod(base_cd + c.crit_damage + u.crit_damage + r.crit_damage + e.crit_damage + l.crit_damage, strength)
+
+				d = (5 + weapon_damage + strength // 5) * (1 + strength / 100) * (1 + crit_damage / 100)
+
+				if d > best:
+					best = d
+					best_route = [c, u, r, e, l]
+					best_str = strength
+					best_cc = cc_mod(base_cc + c.crit_chance + u.crit_chance + r.crit_chance + e.crit_chance + l.crit_chance)
+					best_cd = crit_damage
+				
+		await channel.send(str(best_route))
 
 	async def unimplemented(self, message):
 		await message.channel.send(f'{message.author.mention} this command is unimplemented')
@@ -1062,16 +1345,32 @@ class Bot(discord.Client):
 			channel,
 			title=f'{text}, your **{kind}** is disabled!',
 			description='Re-enable them with [skyblock menu > settings > api settings]'
-		).set_footer(
+		).set_footer( 
 			text='Sometimes this message appears even if your API settings are enabled. If so, exit Hypixel and try again. It\'s also possible that Hypixel\'s API servers are down'
 		).send()
 
 	async def view_missing_talismans(self, message, *args):
 		user = message.author
 		channel = message.channel
-		player = await self.query_player(user, channel)
-		if player is None:
+		
+		if not args:
+			await self.no_args('missing', user, channel)
 			return
+		
+		try:
+			player = await skypy.Player(keys, uname=args[0], guild=True)
+		except (skypy.BadNameError, skypy.NeverPlayedSkyblockError):
+			await channel.send(f'{user.mention} invalid username!')
+			return
+		
+		if len(args) == 1:
+			await player.set_profile_automatically()
+		else:
+			try:
+				await player.set_profile(player.profiles[args[1].capitalize()])
+			except KeyError:
+				await channel.send(f'{user.mention} invalid profile!')
+				return
 
 		if player.enabled_api['inventory'] is False:
 			await self.api_disabled(player.uname, 'inventory API', channel)
@@ -1091,34 +1390,17 @@ class Bot(discord.Client):
 		if talismans:
 			embed.add_field(
 				name='[Roughly sorted by price]',
-				value='\n'.join(talismans.values())
+				value='```' + '\n'.join(talismans.values()) + '```',
+				inline=False
 			)
-
-		await embed.send()
-
-	async def view_unnecessary_talismans(self, message, *args):
-		user = message.author
-		channel = message.channel
-		player = await self.query_player(user, channel)
-		if player is None:
-			return
-
-		if player.enabled_api['inventory'] is False:
-			await self.api_disabled(player.uname, 'inventory API', channel)
-			return
-
-		talismans = [talisman for talisman in player.talismans if talisman.active is False]
-
-		embed = Embed(
-			channel,
-			title=f'{player.uname}, you have {len(talismans)} unnecessary talisman{"" if len(talismans) == 1 else "s"}!',
-			description='Only counting talismans in your bag or inventory'
-		)
-
-		if talismans:
+			
+		inactive = [talisman for talisman in player.talismans if talisman.active is False]
+		
+		if inactive:
 			embed.add_field(
-				name=None,
-				value='\n'.join(map(str, talismans))
+				name=f'You also have {len(inactive)} unnecessary talismans',
+				value='```' + '\n'.join(map(str, inactive)) + '```'
+				'```An unnecessary talisman is any talisman is\nduplicated or part of a talisman familiy```'
 			)
 
 		await embed.send()
@@ -1224,63 +1506,6 @@ class Bot(discord.Client):
 	async def end_event(self, message, *args):
 		await self.unimplemented(message)
 
-	async def query_player(self, user, channel):
-		valid = False
-
-		while valid is False:
-			await channel.send('What is your Minecraft username?')
-			msg = await self.respond(user, channel)
-			if msg is None:
-				return
-
-			msg = msg.content.lower()
-
-			try:
-				player = await skypy.Player(keys, uname=msg)
-				if len(player.profiles) == 0:
-					await channel.send(f'You have no profiles? Please report this{close_message}')
-
-				else:
-					valid = True
-
-			except skypy.NeverPlayedSkyblockError:
-				await channel.send(f'You have never played skyblock{close_message}')
-
-			except skypy.BadNameError:
-				await channel.send(f'Invalid username!{close_message}')
-
-		if len(player.profiles) == 1:
-			await player.set_profile(list(player.profiles.values())[0])
-
-		else:
-			embed = Embed(
-				channel,
-				title='Which profile do you want to use?',
-				description='Sorted by date created'
-			).add_field(
-				name=None,
-				value='\n\n'.join(player.profiles.keys())
-			)
-
-			valid = False
-
-			while valid is False:
-				await embed.send()
-
-				msg = await self.respond(user, channel)
-				if msg is None:
-					return
-				msg = msg.content.capitalize()
-
-				if msg in player.profiles:
-					await player.set_profile(player.profiles[msg])
-					valid = True
-
-				else:
-					await channel.send(f'Invalid profile! Did you make a typo?{close_message}')
-
-		return player
-
 	async def respond(self, user, channel):
 		msg = None
 
@@ -1316,7 +1541,10 @@ class Bot(discord.Client):
 			
 	async def back(self, message, user):
 		return True if await self.reaction_menu(message, user, {'⬅️': True}) else False
-		
+	
+	async def yesno(self, message, user):
+		return await self.reaction_menu(message, user, {'✅': True, '❌': False})
+	
 	async def book(self, user, channel, pages):
 		page_num = 0
 		backward = {'⬅️': -1}
@@ -1355,7 +1583,7 @@ class Bot(discord.Client):
 				if result is None:
 					break
 				await msg.delete()
-				page_num += result			
+				page_num += result		
 
 client = Bot()
 client.loop.create_task(update_trending(trending_threads, last_forums_update))
