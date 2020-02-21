@@ -2,19 +2,19 @@ import os
 import discord
 import skypy
 import skypy_constants
-from bs4 import BeautifulSoup
 import requests
 import asyncio
 import math
 import traceback
 import motor.motor_asyncio
 import itertools
-from datetime import datetime, timezone
-
-time_format = '%m/%d %I:%M %p UTC'
 import re
 import random
 from statistics import mean, median, mode, pstdev, StatisticsError
+from datetime import datetime, timezone
+from bs4 import BeautifulSoup
+
+TIME_FORMAT = '%m/%d %I:%M %p UTC'
 
 if os.environ.get('API_KEY') is None:
     import dotenv
@@ -26,7 +26,7 @@ db = client.sbs
 
 keys = os.getenv('API_KEY').split()
 
-damaging_potions = {
+DAMAGING_POTIONS = {
     'critical': {
         'stats': {
             'crit chance': [0, 10, 15, 20, 25],
@@ -48,7 +48,7 @@ damaging_potions = {
     }
 }
 
-orbs = {
+ORBS = {
     'weird tuba': {
         'internal': 'WEIRD_TUBA',
         'stats': {'strength': 30}
@@ -63,8 +63,74 @@ orbs = {
     }
 }
 
+
+LEADERBOARDS = {
+    'Skill Average': (
+        '📈', lambda player: player.skill_average, None, lambda guild: guild.stat_average('skill_average'), None),
+    'Minion Slots': ('⛓', lambda player: player.unique_minions, lambda player: player.minion_slots,
+                     lambda guild: guild.stat_average('unique_minions'),
+                     lambda guild: guild.stat_average('minion_slots')),
+    'Farming': ('🌾', lambda player: player.skill_experience['farming'], lambda player: player.skills['farming'],
+                lambda guild: guild.stat_average('skill_experience')['farming'],
+                lambda guild: guild.stat_average('skills')['farming']),
+    'Mining': ('⛏', lambda player: player.skill_experience['mining'], lambda player: player.skills['mining'],
+               lambda guild: guild.stat_average('skill_experience')['mining'],
+               lambda guild: guild.stat_average('skills')['mining']),
+    'Combat': ('⚔', lambda player: player.skill_experience['combat'], lambda player: player.skills['combat'],
+               lambda guild: guild.stat_average('skill_experience')['combat'],
+               lambda guild: guild.stat_average('skills')['combat']),
+    'Foraging': ('🪓', lambda player: player.skill_experience['foraging'], lambda player: player.skills['foraging'],
+                 lambda guild: guild.stat_average('skill_experience')['foraging'],
+                 lambda guild: guild.stat_average('skills')['foraging']),
+    'Enchanting': (
+        '📖', lambda player: player.skill_experience['enchanting'], lambda player: player.skills['enchanting'],
+        lambda guild: guild.stat_average('skill_experience')['enchanting'],
+        lambda guild: guild.stat_average('skills')['enchanting']),
+    'Alchemy': ('⚗', lambda player: player.skill_experience['alchemy'], lambda player: player.skills['alchemy'],
+                lambda guild: guild.stat_average('skill_experience')['alchemy'],
+                lambda guild: guild.stat_average('skills')['alchemy']),
+    'Fishing': ('🎣', lambda player: player.skill_experience['fishing'], lambda player: player.skills['fishing'],
+                lambda guild: guild.stat_average('skill_experience')['carpentry'],
+                lambda guild: guild.stat_average('skills')['carpentry']),
+    'Carpentry': ('🪑', lambda player: player.skill_experience['carpentry'], lambda player: player.skills['carpentry'],
+                  lambda guild: guild.stat_average('skill_experience')['farming'],
+                  lambda guild: guild.stat_average('skills')['farming']),
+    'Runecrafting': (
+        '⚜️', lambda player: player.skill_experience['runecrafting'], lambda player: player.skills['runecrafting'],
+        lambda guild: guild.stat_average('skill_experience')['runecrafting'],
+        lambda guild: guild.stat_average('skills')['runecrafting']),
+    'Zombie': ('🧟', lambda player: player.slayer_exp['zombie'], lambda player: player.slayer_levels['zombie'],
+               lambda guild: guild.stat_average('slayer_exp')['zombie'],
+               lambda guild: guild.stat_average('slayer_levels')['zombie']),
+    'Spider': ('🕸️', lambda player: player.slayer_exp['spider'], lambda player: player.slayer_levels['spider'],
+               lambda guild: guild.stat_average('slayer_exp')['spider'],
+               lambda guild: guild.stat_average('slayer_levels')['spider']),
+    'Wolf': ('🐺', lambda player: player.slayer_exp['wolf'], lambda player: player.slayer_levels['wolf'],
+             lambda guild: guild.stat_average('slayer_exp')['wolf'],
+             lambda guild: guild.stat_average('slayer_levels')['wolf'])
+}
+
+LEVELS = {
+    name: leaderboards[name] for name in
+    ['Farming', 'Mining', 'Combat', 'Foraging', 'Enchanting', 'Alchemy', 'Fishing', 'Carpentry', 'Runecrafting',
+     'Zombie', 'Spider', 'Wolf']
+}
+
+RANKS = [
+    ['CAROLINA REAPER', 'GHOST PEPPER', 'HABAÑERO', 'JALAPEÑO', 'SWEET BANANA', 'BELL PEPPER'],
+    ['WIZARD', 'KING', 'QUEEN', 'LORD', 'JESTER', 'PEASANT'],
+    ['PRESIDENT', 'GENERAL', 'MAJOR', 'SERGEANT', 'CORPORAL', 'PRIVATE'],
+    ['S', 'A', 'B', 'C', 'D', 'F'],
+    ['MVP++', 'MVP+', 'MVP', 'VIP+', 'VIP', 'NON'],
+    ['DRAGON', 'DINOSAUR', 'GILA', 'TURTLE', 'SNAKE', 'GECKO'],
+    ['LEGENDARY', 'EPIC', 'RARE', 'UNCOMMON', 'COMMON', '" " " "SPECIAL" " " "'],
+    ['GOD', 'PRO', 'ADVANCED', 'VIABLE', 'AVERAGE', 'NOOB'],
+    ['PC', 'NINTENDO', 'PLAY STATION', 'XBOX', 'VR', 'MOBILE']
+]
+
+
 # list of all enchantment powers per level. can be a function or a number
-enchantment_values = {
+ENCHANTMENT_VALUES = {
     # sword always
     'sharpness': 5,
     'giant_killer': lambda level: 25 if level > 0 else 0,
@@ -85,7 +151,7 @@ enchantment_values = {
     'spiked_hook': 5
 }
 
-max_levels = {
+MAX_BOOK_LEVELS = {
     'sharpness': 6,
     'giant_killer': 6,
     'smite': 6,
@@ -101,7 +167,7 @@ max_levels = {
     'spiked_hook': 6
 }
 
-cheapo_levels = {
+CHEAP_MAX_BOOK_LEVELS = {
     'sharpness': 5,
     'giant_killer': 5,
     'smite': 5,
@@ -118,7 +184,7 @@ cheapo_levels = {
 }
 
 # list of relevant enchants for common mobs
-activities = {
+ACTIVITIES = {
     'slayer bosses': [
         'giant_killer',
         'sharpness',
@@ -190,7 +256,7 @@ activities = {
     ]
 }
 
-relavant_reforges = {
+RELEVANT_REFORGES = {
     'forceful': (None, None, (7, 0, 0), None, None),
     'itchy': ((1, 0, 3), (2, 0, 5), (2, 0, 8), (3, 0, 12), (5, 0, 15)),
     'strong': (None, None, (4, 0, 4), (7, 0, 7), (10, 0, 10)),
@@ -199,89 +265,13 @@ relavant_reforges = {
 reforges_list = list(relavant_reforges.values())
 
 # Forums parsing ---
-
 trending_threads = []
 last_forums_update = [datetime.now()]
 num_trending = 3
 trending_timeout = 24
-trending_algorithm = lambda thread: (thread['views'] + thread['likes'] * 200) / math.sqrt(thread['date'] / 1000 + 1)
 
 
-async def update_trending(trending_threads, last_forums_update):
-    class Timeout(Exception):
-        pass
 
-    class Nothing(Exception):
-        pass
-
-    while True:
-        pagenumber = 1
-        now = None
-        backup = trending_threads.copy()
-        trending_threads.clear()
-        s = requests.session()
-
-        try:
-            while True:
-                await client.log(f'Attempting to parse forums page {pagenumber}')
-                soup = BeautifulSoup(
-                    s.get(f'https://hypixel.net/forums/skyblock.157/page-{pagenumber}?order=post_date').content,
-                    'html.parser',
-                    multi_valued_attributes=None
-                )
-                posts = soup.find_all(class_='discussionListItem visible  ')
-                if not posts:
-                    raise Nothing
-
-                for post in posts:
-                    thread = {}
-
-                    header = post.find('h3').a
-                    thread['link'] = f'https://hypixel.net/{header["href"]}'
-                    thread['name'] = header.string
-
-                    info = post.find(class_='listBlock stats pairsJustified')
-                    thread['likes'] = int(info['title'].replace('Members who liked the first message: ', ''))
-                    thread['views'] = int(info.find(class_='minor').dd.string.replace(',', ''))
-                    thread['replies'] = int(info.find(class_='major').dd.string.replace(',', ''))
-                    thread['date'] = int(post.find(class_='posterDate muted').find('abbr')['data-time'])
-
-                    if now is None:
-                        now = thread['date']
-
-                    thread['date'] = now - thread['date']
-                    if thread['date'] >= trending_timeout * 3600:
-                        raise Timeout
-
-                    if discord.utils.find(lambda t: thread['link'] == t['link'], trending_threads) is None:
-                        trending_threads.append(thread)
-                        trending_threads.sort(key=trending_algorithm, reverse=True)
-                        del trending_threads[num_trending:]
-                pagenumber += 1
-
-        except Timeout:
-            now = datetime.now(timezone.utc)
-            last_forums_update[0] = now
-            await client.log(
-                f'Trending threads updated at {now.strftime(time_format)}. {pagenumber} pages parsed\n',
-                '\n'.join([thread['link'] for thread in trending_threads])
-            )
-
-        except (Nothing, RuntimeError):
-            now = datetime.now(timezone.utc)
-            await client.log(f'Failed to parse forums at {now.strftime(time_format)}')
-            trending_threads = backup
-
-        await asyncio.sleep(3600 * 2)
-
-
-# ! -------------- !
-
-def chunks(lst, n):
-    lst = list(lst)
-    """Yield successive n-sized chunks from lst."""
-    for i in range(0, len(lst), n):
-        yield lst[i:i + n]
 
 
 class Embed(discord.Embed):
@@ -295,7 +285,8 @@ class Embed(discord.Embed):
 
         super().__init__(title=title or self.nbst, color=self.color(channel), **kwargs)
 
-    def color(self, channel):
+    @staticmethod
+    def color(channel):
         default = 0xbf2158
 
         if hasattr(channel, 'guild'):
@@ -311,7 +302,7 @@ class Embed(discord.Embed):
         return await self.channel.send(embed=self)
 
 
-discord.Embed = None
+
 
 
 class Route:
@@ -358,89 +349,79 @@ def rarity_grammar(rarity, count=0):
     return f'{rarity[:-1]}ies' if rarity[-1] == 'y' else f'{rarity}s'
 
 
-leaderboards = {
-    'Skill Average': (
-        '📈', lambda player: player.skill_average, None, lambda guild: guild.stat_average('skill_average'), None),
-    'Minion Slots': ('⛓', lambda player: player.unique_minions, lambda player: player.minion_slots,
-                     lambda guild: guild.stat_average('unique_minions'),
-                     lambda guild: guild.stat_average('minion_slots')),
-    'Farming': ('🌾', lambda player: player.skill_experience['farming'], lambda player: player.skills['farming'],
-                lambda guild: guild.stat_average('skill_experience')['farming'],
-                lambda guild: guild.stat_average('skills')['farming']),
-    'Mining': ('⛏', lambda player: player.skill_experience['mining'], lambda player: player.skills['mining'],
-               lambda guild: guild.stat_average('skill_experience')['mining'],
-               lambda guild: guild.stat_average('skills')['mining']),
-    'Combat': ('⚔', lambda player: player.skill_experience['combat'], lambda player: player.skills['combat'],
-               lambda guild: guild.stat_average('skill_experience')['combat'],
-               lambda guild: guild.stat_average('skills')['combat']),
-    'Foraging': ('🪓', lambda player: player.skill_experience['foraging'], lambda player: player.skills['foraging'],
-                 lambda guild: guild.stat_average('skill_experience')['foraging'],
-                 lambda guild: guild.stat_average('skills')['foraging']),
-    'Enchanting': (
-        '📖', lambda player: player.skill_experience['enchanting'], lambda player: player.skills['enchanting'],
-        lambda guild: guild.stat_average('skill_experience')['enchanting'],
-        lambda guild: guild.stat_average('skills')['enchanting']),
-    'Alchemy': ('⚗', lambda player: player.skill_experience['alchemy'], lambda player: player.skills['alchemy'],
-                lambda guild: guild.stat_average('skill_experience')['alchemy'],
-                lambda guild: guild.stat_average('skills')['alchemy']),
-    'Fishing': ('🎣', lambda player: player.skill_experience['fishing'], lambda player: player.skills['fishing'],
-                lambda guild: guild.stat_average('skill_experience')['carpentry'],
-                lambda guild: guild.stat_average('skills')['carpentry']),
-    'Carpentry': ('🪑', lambda player: player.skill_experience['carpentry'], lambda player: player.skills['carpentry'],
-                  lambda guild: guild.stat_average('skill_experience')['farming'],
-                  lambda guild: guild.stat_average('skills')['farming']),
-    'Runecrafting': (
-        '⚜️', lambda player: player.skill_experience['runecrafting'], lambda player: player.skills['runecrafting'],
-        lambda guild: guild.stat_average('skill_experience')['runecrafting'],
-        lambda guild: guild.stat_average('skills')['runecrafting']),
-    'Zombie': ('🧟', lambda player: player.slayer_exp['zombie'], lambda player: player.slayer_levels['zombie'],
-               lambda guild: guild.stat_average('slayer_exp')['zombie'],
-               lambda guild: guild.stat_average('slayer_levels')['zombie']),
-    'Spider': ('🕸️', lambda player: player.slayer_exp['spider'], lambda player: player.slayer_levels['spider'],
-               lambda guild: guild.stat_average('slayer_exp')['spider'],
-               lambda guild: guild.stat_average('slayer_levels')['spider']),
-    'Wolf': ('🐺', lambda player: player.slayer_exp['wolf'], lambda player: player.slayer_levels['wolf'],
-             lambda guild: guild.stat_average('slayer_exp')['wolf'],
-             lambda guild: guild.stat_average('slayer_levels')['wolf'])
-}
-
-levels = {
-    name: leaderboards[name] for name in
-    ['Farming', 'Mining', 'Combat', 'Foraging', 'Enchanting', 'Alchemy', 'Fishing', 'Carpentry', 'Runecrafting',
-     'Zombie', 'Spider', 'Wolf']
-}
-
-ranks = [
-    ['CAROLINA REAPER', 'GHOST PEPPER', 'HABAÑERO', 'JALAPEÑO', 'SWEET BANANA', 'BELL PEPPER'],
-    ['WIZARD', 'KING', 'QUEEN', 'LORD', 'JESTER', 'PEASANT'],
-    ['PRESIDENT', 'GENERAL', 'MAJOR', 'SERGEANT', 'CORPORAL', 'PRIVATE'],
-    ['S', 'A', 'B', 'C', 'D', 'F'],
-    ['MVP++', 'MVP+', 'MVP', 'VIP+', 'VIP', 'NON'],
-    ['DRAGON', 'DINOSAUR', 'GILA', 'TURTLE', 'SNAKE', 'GECKO'],
-    ['LEGENDARY', 'EPIC', 'RARE', 'UNCOMMON', 'COMMON', '" " " "SPECIAL" " " "'],
-    ['GOD', 'PRO', 'ADVANCED', 'VIABLE', 'AVERAGE', 'NOOB'],
-    ['PC', 'NINTENDO', 'PLAY STATION', 'XBOX', 'VR', 'MOBILE']
-]
-
-close_message = '\n> _use **exit** to close the session_'
-args_message = '`[] signifies a required argument, while () signifies an optional argument`'
 
 whitelisted_servers = [int(server) for server in os.getenv('SERVERS').split()]
 
 
+async def unimplemented(message):
+    await message.channel.send(f'{message.author.mention} this command is unimplemented')
+
+
+async def view_trending(message, *args):
+    embed = Embed(
+        message.channel,
+        title='Trending Threads',
+        description=f'It\'s the talk of the town! Here\'s three popular threads from the past {trending_timeout} hours'
+    ).set_footer(
+        text=f'Last updated {last_forums_update[0].strftime(time_format)}'
+    )
+
+    if trending_threads:
+        for thread in trending_threads:
+            embed.add_field(
+                name=f'**{thread["name"]}\n_{thread["views"]} views_ | _{thread["likes"]} likes_**',
+                value=f'[{thread["link"]}]'
+            )
+    else:
+        embed.add_field(
+            name=None,
+            value='Hypixel currently has their anti DDOS protection enabled. I can\'t get in!'
+        )
+
+    await embed.send()
+
+
+async def api_disabled(text, kind, channel):
+    await Embed(
+        channel,
+        title=f'{text}, your **{kind}** is disabled!',
+        description='Re-enable them with [skyblock menu > settings > api settings]'
+    ).set_footer(
+        text='Sometimes this message appears even if your API settings are enabled. If so, exit Hypixel and try again. It\'s also possible that Hypixel\'s API servers are down'
+    ).send()
+
+
+async def support_server(message, *args):
+    await Embed(
+        message.channel,
+        title='Here\'s a link to my support server',
+        description='[https://discord.gg/8Wbh3p7]'
+    ).set_footer(
+        text='(ﾉ◕ヮ◕)ﾉ*:･ﾟ✧'
+    ).send()
+
+
+def craftlink(query, *, operation, **kwargs):
+    json = {
+        'operationName': operation,
+        'variables': dict(kwargs),
+        'query': query
+    }
+
+    r = requests.post(f'https://craftlink.xyz/graphql', json=json)
+    r.raise_for_status()
+    r = r.json()
+
+    return r['data']
+
+
+# async def on_error(event, *args, **kwargs):
+#     traceback.print_exc()
+#
+
 class Bot(discord.Client):
     def __init__(self, *args, **kwargs):
-        self.hot_channels = {}
-        self.ready = False
-
-        super().__init__(*args, **kwargs)
-
-    async def log(self, *args):
-        print(*args, sep='')
-
-    async def on_ready(self):
-        await self.log(f'Logged on as {self.user}!')
-
+        self.callables = {}
         self.commands = {
             'bot': {
                 'emoji': '🤖',
@@ -554,17 +535,24 @@ class Bot(discord.Client):
                 }
             }
         }
+        self.hot_channels = {}
+        self.ready = False
+        self.args_message = '`[] signifies a required argument, while () signifies an optional argument`'
 
-        self.callables = {}
+        super().__init__(*args, **kwargs)
+
+    async def log(self, *args):
+        print(*args, sep='')
+
+    async def on_ready(self):
+        await self.log(f'Logged on as {self.user}!')
+
         for data in self.commands.values():
             self.callables.update(data['commands'])
 
         await self.change_presence(activity=discord.Game('| 🍤 sbs help'))
 
         self.ready = True
-
-    async def on_error(self, event, *args, **kwargs):
-        traceback.print_exc()
 
     async def on_message(self, message):
         if self.ready is False:
@@ -649,7 +637,7 @@ class Bot(discord.Client):
         await Embed(
             channel,
             title='This command requires arguments!',
-            description=f'Correct usage is `{usage}`\n{args_message}'
+            description=f'Correct usage is `{usage}`\n{self.args_message}'
         ).send()
 
     async def royalty(self, message, *args):
@@ -702,19 +690,6 @@ class Bot(discord.Client):
             if embed is None:
                 break
             await msg.delete()
-
-    def craftlink(self, query, *, operation, **kwargs):
-        json = {
-            'operationName': operation,
-            'variables': dict(kwargs),
-            'query': query
-        }
-
-        r = requests.post(f'https://craftlink.xyz/graphql', json=json)
-        r.raise_for_status()
-        r = r.json()
-
-        return r['data']
 
     async def price(self, message, *args):
         user = message.author
@@ -827,9 +802,9 @@ class Bot(discord.Client):
                               f'{datetime.fromtimestamp(int(auction["end"]) // 1000).strftime(time_format)}```'
                     )
             else:
-                embed.add_field(name=None, value='```¯\_(ツ)_/¯```')
+                embed.add_field(name=None, value='```¯\\_(ツ)_/¯```')
 
-            return (embed, last_page)
+            return embed, last_page
 
         await self.book(user, channel, pages)
 
@@ -875,9 +850,9 @@ class Bot(discord.Client):
                               f'{datetime.fromtimestamp(int(auction["end"]) // 1000).strftime(time_format)}```'
                     )
             else:
-                embed.add_field(name=None, value='```¯\_(ツ)_/¯```')
+                embed.add_field(name=None, value='```¯\\_(ツ)_/¯```')
 
-            return (embed, last_page)
+            return embed, last_page
 
         await self.book(user, channel, pages)
 
@@ -927,6 +902,13 @@ class Bot(discord.Client):
             )
 
         await embed.send()
+
+    @staticmethod
+    def chunks(lst, n):
+        lst = list(lst)
+        """Yield successive n-sized chunks from lst."""
+        for i in range(0, len(lst), n):
+            yield lst[i:i + n]
 
     async def guild(self, message, *args):
         user = message.author
@@ -1030,8 +1012,8 @@ class Bot(discord.Client):
         user = message.author
         channel = message.channel
 
+        close_message = '\n> _use **exit** to close the session_'
         valid = False
-
         while valid is False:
             await channel.send(f'{user.mention} what is your Minecraft username?')
             msg = await self.respond(user, channel)
@@ -1050,9 +1032,11 @@ class Bot(discord.Client):
 
             except skypy.NeverPlayedSkyblockError:
                 await channel.send(f'You have never played skyblock{close_message}')
+                return
 
             except skypy.BadNameError:
                 await channel.send(f'Invalid username!{close_message}')
+                return
 
         if len(player.profiles) == 1:
             await player.set_profile(list(player.profiles.values())[0])
@@ -1164,8 +1148,8 @@ class Bot(discord.Client):
             if level is None:
                 return
 
-            for name, amount in buff.items():
-                stats[name] += amount[level]
+            for name1, amount in buff.items():
+                stats[name1] += amount[level]
 
         for name, orb in orbs.items():
             internal_name = orb['internal']
@@ -1278,32 +1262,6 @@ class Bot(discord.Client):
 
         await channel.send(str(best_route))
 
-    async def unimplemented(self, message):
-        await message.channel.send(f'{message.author.mention} this command is unimplemented')
-
-    async def view_trending(self, message, *args):
-        embed = Embed(
-            message.channel,
-            title='Trending Threads',
-            description=f'It\'s the talk of the town! Here\'s three popular threads from the past {trending_timeout} hours'
-        ).set_footer(
-            text=f'Last updated {last_forums_update[0].strftime(time_format)}'
-        )
-
-        if trending_threads:
-            for thread in trending_threads:
-                embed.add_field(
-                    name=f'**{thread["name"]}\n_{thread["views"]} views_ | _{thread["likes"]} likes_**',
-                    value=f'[{thread["link"]}]'
-                )
-        else:
-            embed.add_field(
-                name=None,
-                value='Hypixel currently has their anti DDOS protection enabled. I can\'t get in!'
-            )
-
-        await embed.send()
-
     async def calculate_damage(self, message, *args):
         channel = message.channel
         user = message.author
@@ -1389,15 +1347,6 @@ class Bot(discord.Client):
             value='```lua\n(5 + damage + floor(str ÷ 5)) ⋅\n(1 + str ÷ 100) ⋅\n(1 + cd ÷ 100) ⋅\n(1 + enchants ÷ 100)```'
         ).send()
 
-    async def api_disabled(self, text, kind, channel):
-        await Embed(
-            channel,
-            title=f'{text}, your **{kind}** is disabled!',
-            description='Re-enable them with [skyblock menu > settings > api settings]'
-        ).set_footer(
-            text='Sometimes this message appears even if your API settings are enabled. If so, exit Hypixel and try again. It\'s also possible that Hypixel\'s API servers are down'
-        ).send()
-
     async def view_missing_talismans(self, message, *args):
         user = message.author
         channel = message.channel
@@ -1454,15 +1403,6 @@ class Bot(discord.Client):
 
         await embed.send()
 
-    async def support_server(self, message, *args):
-        await Embed(
-            message.channel,
-            title='Here\'s a link to my support server',
-            description='[https://discord.gg/8Wbh3p7]'
-        ).set_footer(
-            text='(ﾉ◕ヮ◕)ﾉ*:･ﾟ✧'
-        ).send()
-
     async def help(self, message, *args):
         user = message.author
         channel = message.channel
@@ -1476,7 +1416,7 @@ class Bot(discord.Client):
             dm,
             title='Skyblock Simplified',
             description='Welcome to Skyblock Simplified, a Skyblock bot designed to streamline gameplay\nAdd to your server with https://tinyurl.com/add-sbs\n'
-                        f'**React to this message with any of the emojis to view commands**\n{args_message}\n'
+                        f'**React to this message with any of the emojis to view commands**\n{self.args_message}\n'
         ).set_footer(
             text='Skyblock Simplified for Hypixel Skyblock | Created by notnotmelon#7218'
         )
@@ -1501,7 +1441,7 @@ class Bot(discord.Client):
             boxes[data['emoji']] = Embed(
                 dm,
                 title=category.capitalize(),
-                description=f'{args_message}\n```{category_data["desc"]}```'
+                description=f'{self.args_message}\n```{category_data["desc"]}```'
             ).add_field(
                 name=None,
                 value='\n\n'.join([command_desc(name, data) for name, data in category_data['commands'].items()])
@@ -1637,13 +1577,6 @@ class Bot(discord.Client):
                 page_num += result
 
 
-client = Bot()
-
-top_players = {name: db[name] for name in leaderboards.keys()}
-for name in leaderboards.keys():
-    client.loop.run_until_complete(db[name].create_index('points', unique=False))
-
-
 async def update_top_players(player):
     for skill, players in top_players.items():
         lb = leaderboards[skill]
@@ -1655,5 +1588,84 @@ async def update_top_players(player):
             await players.insert_one({'uuid': player.uuid, 'name': player.uname, 'points': own})
 
 
-client.loop.create_task(update_trending(trending_threads, last_forums_update))
+async def update_trending():
+    global trending_threads
+    global last_forums_update
+
+    class Timeout(Exception):
+        pass
+
+    class Nothing(Exception):
+        pass
+
+    while True:
+        pagenumber = 1
+        now = None
+        backup = trending_threads.copy()
+        trending_threads.clear()
+        s = requests.session()
+
+        try:
+            while True:
+                await client.log(f'Attempting to parse forums page {pagenumber}')
+                soup = BeautifulSoup(
+                    s.get(f'https://hypixel.net/forums/skyblock.157/page-{pagenumber}?order=post_date').content,
+                    'html.parser',
+                    multi_valued_attributes=None
+                )
+                posts = soup.find_all(class_='discussionListItem visible  ')
+                if not posts:
+                    raise Nothing
+
+                for post in posts:
+                    thread = {}
+
+                    header = post.find('h3').a
+                    thread['link'] = f'https://hypixel.net/{header["href"]}'
+                    thread['name'] = header.string
+
+                    info = post.find(class_='listBlock stats pairsJustified')
+                    thread['likes'] = int(info['title'].replace('Members who liked the first message: ', ''))
+                    thread['views'] = int(info.find(class_='minor').dd.string.replace(',', ''))
+                    thread['replies'] = int(info.find(class_='major').dd.string.replace(',', ''))
+                    thread['date'] = int(post.find(class_='posterDate muted').find('abbr')['data-time'])
+
+                    if now is None:
+                        now = thread['date']
+
+                    thread['date'] = now - thread['date']
+                    if thread['date'] >= trending_timeout * 3600:
+                        raise Timeout
+
+                    if discord.utils.find(lambda t: thread['link'] == t['link'], trending_threads) is None:
+                        trending_threads.append(thread)
+                        trending_algorithm = lambda thread: (thread['views'] + thread['likes'] * 200) / math.sqrt(
+                            thread['date'] / 1000 + 1)
+                        trending_threads.sort(key=trending_algorithm, reverse=True)
+                        del trending_threads[num_trending:]
+                pagenumber += 1
+
+        except Timeout:
+            now = datetime.now(timezone.utc)
+            last_forums_update[0] = now
+            await client.log(
+                f'Trending threads updated at {now.strftime(time_format)}. {pagenumber} pages parsed\n',
+                '\n'.join([thread['link'] for thread in trending_threads])
+            )
+
+        except (Nothing, RuntimeError):
+            now = datetime.now(timezone.utc)
+            await client.log(f'Failed to parse forums at {now.strftime(time_format)}')
+            trending_threads = backup
+
+        await asyncio.sleep(3600 * 2)
+
+discord.Embed = None # Disable default discord Embed
+client = Bot()
+
+top_players = {name: db[name] for name in leaderboards.keys()}
+for name in leaderboards.keys():
+    client.loop.run_until_complete(db[name].create_index('points', unique=False))
+
+client.loop.create_task(update_trending())
 client.run(os.getenv('DISCORD_TOKEN'))
