@@ -7,7 +7,13 @@ from datetime import datetime
 import time
 # --------
 
-session = aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=15), raise_for_status=True)
+_session = None
+
+async def session():
+	global _session
+	if _session is None:
+		_session = aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=15), raise_for_status=True)
+	return _session
 
 # Inventory parsing
 from base64 import b64decode as one
@@ -112,6 +118,9 @@ class Item:
 		self.slot_number = slot_number
 		self.internal_name = self['tag'].get('ExtraAttributes', {}).get('id', None)
 		self.description = self['tag'].get('display', {}).get('Lore', None)
+		self.hot_potatos = self['tag'].get('ExtraAttributes', {}).get('hot_potato_count', 0)
+		self.collection_date = self['tag'].get('ExtraAttributes', {}).get('timestamp', '') # 'timestamp': '2/16/20 9:24 PM',
+		self.runes = self['tag'].get('ExtraAttributes', {}).get('runes', {}) # 'runes': {'ZOMBIE_SLAYER': 3},
 
 		try:
 			self.enchantments = self['tag']['ExtraAttributes']['enchantments']
@@ -161,6 +170,10 @@ class Item:
 	# Can't it just be in the nbt data?
 	def stats(self, use_reforge=True):
 		results = {}
+		name = self.internal_name
+				
+		reforge_multiplier = 1
+		
 		# §7Attack Speed: §c+2% §8(Itchy +2%)
 		# §7Intelligence: §a+9 §c(Godly +3)
 		reg = re.compile(
@@ -179,12 +192,12 @@ class Item:
 			match = reg.match(line)
 			if match:
 				results[match[1].lower()] = int(match[2])
-
-		name = self.internal_name
-
+				
 		def add(stat, amount):
 			results[stat] = results.get(stat, 0) + amount
 
+		end_defence = {'END_HELMET': 35, 'END_CHESTPLATE': 60, 'END_LEGGINGS': 50, 'END_BOOTS': 25}
+				
 		if name == 'RECLUSE_FANG':
 			add('strength', 370)
 		elif name == 'SHREDDER':
@@ -199,21 +212,26 @@ class Item:
 		elif name == 'GRAVITY_TALISMAN':
 			add('strength', 10)
 			add('defense', 10)
+		elif name in end_defence.keys():
+			if results['defense'] - self.hot_potatos * 2 <= end_defence[self.internal_name] * 2:
+				for k in results.keys():
+					results[k] *= 2
+			else:
+				reforge_multiplier = 2
 
 		if use_reforge is False:
 			reforge = self.reforge()
 			if reforge:
 				for stat, amount in reforges[self.reforge()][self.rarity_level()].items():
 					if stat in results:
-						results[stat] -= amount
+						results[stat] -= amount * reforge_multiplier
 		return results
-
 
 def damage(weapon_dmg, strength, crit_dmg, ench_modifier):
 	return (5 + weapon_dmg + strength // 5) * (1 + strength / 100) * (1 + crit_dmg / 100) * (1 + ench_modifier / 100)
 
 async def get_uuid(uname):
-	r = await session.get(f'https://api.mojang.com/users/profiles/minecraft/{uname}')
+	r = await (await session()).get(f'https://api.mojang.com/users/profiles/minecraft/{uname}')
 	try:
 		return (await r.json(content_type=None))['id']
 	except TypeError:
@@ -223,7 +241,7 @@ async def get_uuid(uname):
 
 
 async def get_uname(uuid):
-	r = await session.get(f'https://api.mojang.com/user/profiles/{uuid}/names')
+	r = await (await session()).get(f'https://api.mojang.com/user/profiles/{uuid}/names')
 	try:
 		return (await r.json(content_type=None))[-1]['name']
 	except TypeError:
@@ -243,7 +261,7 @@ class ApiInterface:
 		url = f'https://api.hypixel.net{api}'
 		
 		try:
-			async with session.get(url, params=kwargs) as data:
+			async with (await session()).get(url, params=kwargs) as data:
 				data = await data.json(content_type=None)
 				
 				if data['success']:
@@ -715,13 +733,10 @@ class Player(ApiInterface):
 		return stats
 
 	def armor_stats(self, include_reforges=True):
-		stats = {}
+		stats = {}		
 		for armor in self.armor:
 			for stat, amount in armor.stats().items():
-				if 'ENDER' in armor.internal_name:
-					stats[stat] = stats.get(stat, 0) + amount * 2
-				else:
-					stats[stat] = stats.get(stat, 0) + amount
+				stats[stat] = stats.get(stat, 0) + amount * multiplier
 		return stats
 
 	def stat_modifiers(self):

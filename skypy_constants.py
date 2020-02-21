@@ -12,7 +12,8 @@ sword_enchants = [
     'scavenger',
     'vampirism',
     'bane_of_arthropods',
-    'smite'
+    'smite',
+    'dragon_hunter'
 ]
 
 bow_enchants = [
@@ -34,7 +35,8 @@ rod_enchants = [
     'frail',
     'luck_of_the_sea',
     'lure',
-    'magnet'
+    'magnet',
+    'looting'
 ]
 
 skill_rewards = {
@@ -145,7 +147,8 @@ tiered_talismen = (  # Helps me filter useless talismen
     ('HUNTER_TALISMAN', 'HUNTER_RING'),
     ('ZOMBIE_TALISMAN', 'ZOMBIE_RING', 'ZOMBIE_ARTIFACT'),
     ('BAT_TALISMAN', 'BAT_RING', 'BAT_ARTIFACT'),
-    ('SHADY_RING', 'CROOKED_ARTIFACT', 'SEAL_OF_THE_FAMILY')
+    ('SHADY_RING', 'CROOKED_ARTIFACT', 'SEAL_OF_THE_FAMILY'),
+    ('WOLF_TALISMAN', 'WOLF_RING')
 )
 
 reforges = {
