@@ -16,15 +16,6 @@ from bs4 import BeautifulSoup
 
 TIME_FORMAT = '%m/%d %I:%M %p UTC'
 
-if os.environ.get('API_KEY') is None:
-    import dotenv
-
-    dotenv.load_dotenv()
-
-client = motor.motor_asyncio.AsyncIOMotorClient(os.getenv('DATABASE_URI'))
-db = client.sbs
-
-keys = os.getenv('API_KEY').split()
 
 DAMAGING_POTIONS = {
     'critical': {
@@ -62,7 +53,6 @@ ORBS = {
         'stats': {'strength': 25}
     }
 }
-
 
 LEADERBOARDS = {
     'Skill Average': (
@@ -111,7 +101,7 @@ LEADERBOARDS = {
 }
 
 LEVELS = {
-    name: leaderboards[name] for name in
+    name: LEADERBOARDS[name] for name in
     ['Farming', 'Mining', 'Combat', 'Foraging', 'Enchanting', 'Alchemy', 'Fishing', 'Carpentry', 'Runecrafting',
      'Zombie', 'Spider', 'Wolf']
 }
@@ -127,7 +117,6 @@ RANKS = [
     ['GOD', 'PRO', 'ADVANCED', 'VIABLE', 'AVERAGE', 'NOOB'],
     ['PC', 'NINTENDO', 'PLAY STATION', 'XBOX', 'VR', 'MOBILE']
 ]
-
 
 # list of all enchantment powers per level. can be a function or a number
 ENCHANTMENT_VALUES = {
@@ -262,16 +251,13 @@ RELEVANT_REFORGES = {
     'strong': (None, None, (4, 0, 4), (7, 0, 7), (10, 0, 10)),
     'godly': (None, None, (4, 2, 3), (7, 3, 6), (10, 5, 8))
 }
-reforges_list = list(relavant_reforges.values())
+reforges_list = list(RELEVANT_REFORGES.values())
 
 # Forums parsing ---
 trending_threads = []
 last_forums_update = [datetime.now()]
 num_trending = 3
 trending_timeout = 24
-
-
-
 
 
 class Embed(discord.Embed):
@@ -302,9 +288,6 @@ class Embed(discord.Embed):
         return await self.channel.send(embed=self)
 
 
-
-
-
 class Route:
     def __init__(self, talismans, rarity):
         self.strength, self.crit_chance, self.crit_damage = [
@@ -322,97 +305,38 @@ class Route:
                           f'{rarity_grammar(self.rarity_str, c)}'
                           for name, c in zip(relavant_reforges.keys(), self.counts) if c != 0])
 
-
-def routes(count, size, rarity):
-    def helper(count, idx, current):
-        if count == 0:
-            yield Route(current, rarity)
-        elif idx == size - 1:
-            new = current.copy()
-            new[idx] += count
-            yield Route(new, rarity)
-        else:
-            if reforges_list[idx][rarity]:
+    @staticmethod
+    def routes(count, size, rarity):
+        def helper(count, idx, current):
+            if count == 0:
+                yield Route(current, rarity)
+            elif idx == size - 1:
                 new = current.copy()
-                new[idx] += 1
-                for x in helper(count - 1, idx, new):
+                new[idx] += count
+                yield Route(new, rarity)
+            else:
+                if reforges_list[idx][rarity]:
+                    new = current.copy()
+                    new[idx] += 1
+                    for x in helper(count - 1, idx, new):
+                        yield x
+                for x in helper(count, idx + 1, current):
                     yield x
-            for x in helper(count, idx + 1, current):
-                yield x
 
-    return helper(count, 0, [0] * size)
+        return helper(count, 0, [0] * size)
 
-
-def rarity_grammar(rarity, count=0):
-    if count == 1:
-        return rarity
-    return f'{rarity[:-1]}ies' if rarity[-1] == 'y' else f'{rarity}s'
+    @staticmethod
+    def rarity_grammar(rarity, count=0):
+        if count == 1:
+            return rarity
+        return f'{rarity[:-1]}ies' if rarity[-1] == 'y' else f'{rarity}s'
 
 
-
-whitelisted_servers = [int(server) for server in os.getenv('SERVERS').split()]
-
-
-async def unimplemented(message):
-    await message.channel.send(f'{message.author.mention} this command is unimplemented')
-
-
-async def view_trending(message, *args):
-    embed = Embed(
-        message.channel,
-        title='Trending Threads',
-        description=f'It\'s the talk of the town! Here\'s three popular threads from the past {trending_timeout} hours'
-    ).set_footer(
-        text=f'Last updated {last_forums_update[0].strftime(time_format)}'
-    )
-
-    if trending_threads:
-        for thread in trending_threads:
-            embed.add_field(
-                name=f'**{thread["name"]}\n_{thread["views"]} views_ | _{thread["likes"]} likes_**',
-                value=f'[{thread["link"]}]'
-            )
-    else:
-        embed.add_field(
-            name=None,
-            value='Hypixel currently has their anti DDOS protection enabled. I can\'t get in!'
-        )
-
-    await embed.send()
-
-
-async def api_disabled(text, kind, channel):
-    await Embed(
-        channel,
-        title=f'{text}, your **{kind}** is disabled!',
-        description='Re-enable them with [skyblock menu > settings > api settings]'
-    ).set_footer(
-        text='Sometimes this message appears even if your API settings are enabled. If so, exit Hypixel and try again. It\'s also possible that Hypixel\'s API servers are down'
-    ).send()
-
-
-async def support_server(message, *args):
-    await Embed(
-        message.channel,
-        title='Here\'s a link to my support server',
-        description='[https://discord.gg/8Wbh3p7]'
-    ).set_footer(
-        text='(ﾉ◕ヮ◕)ﾉ*:･ﾟ✧'
-    ).send()
-
-
-def craftlink(query, *, operation, **kwargs):
-    json = {
-        'operationName': operation,
-        'variables': dict(kwargs),
-        'query': query
-    }
-
-    r = requests.post(f'https://craftlink.xyz/graphql', json=json)
-    r.raise_for_status()
-    r = r.json()
-
-    return r['data']
+def chunks(lst, n):
+        lst = list(lst)
+        """Yield successive n-sized chunks from lst."""
+        for i in range(0, len(lst), n):
+            yield lst[i:i + n]
 
 
 # async def on_error(event, *args, **kwargs):
@@ -592,6 +516,7 @@ class Bot(discord.Client):
             return
 
         '''
+        whitelisted_servers = [int(server) for server in os.getenv('SERVERS').split()]
         if not dm and not channel.guild.id in whitelisted_servers and len(channel.guild.members) > 50:
             await Embed(
                 channel,
@@ -646,7 +571,7 @@ class Bot(discord.Client):
 
         menu = {}
 
-        for name, (emoji, function, optional_function, _, _) in leaderboards.items():
+        for name, (emoji, function, optional_function, _, _) in LEADERBOARDS.items():
             lb = Embed(
                 channel,
                 title=f'{name} Leaderboard',
@@ -895,7 +820,7 @@ class Bot(discord.Client):
             url=player.skin()
         )
 
-        for name, (emoji, function, optional_function, _, _) in levels.items():
+        for name, (emoji, function, optional_function, _, _) in LEVELS.items():
             embed.add_field(
                 name=f'{emoji}\t{name}',
                 value=f'```Level > {optional_function(player)}\nxp: {function(player):,}```'
@@ -903,12 +828,6 @@ class Bot(discord.Client):
 
         await embed.send()
 
-    @staticmethod
-    def chunks(lst, n):
-        lst = list(lst)
-        """Yield successive n-sized chunks from lst."""
-        for i in range(0, len(lst), n):
-            yield lst[i:i + n]
 
     async def guild(self, message, *args):
         user = message.author
@@ -939,7 +858,7 @@ class Bot(discord.Client):
                         f'Slots > {round(guild.stat_average("minion_slots"), 3)} ({round(guild.stat_average("unique_minions"))} crafts)```'
         )
 
-        for name, (emoji, _, _, function, optional_function) in levels.items():
+        for name, (emoji, _, _, function, optional_function) in LEVELS.items():
             embed.add_field(
                 name=f'{emoji}\t{name}',
                 value=f'```Level > {round(optional_function(guild), 3)}\nxp: {round(function(guild)):,}```'
@@ -947,7 +866,7 @@ class Bot(discord.Client):
 
         menu = {}
         prompt = {}
-        for name, (emoji, function, optional_function, _, _) in leaderboards.items():
+        for name, (emoji, function, optional_function, _, _) in LEADERBOARDS.items():
             lb = Embed(
                 channel,
                 title=f'{guild.gname} {name} Leaderboard'
@@ -969,7 +888,7 @@ class Bot(discord.Client):
 
             portion = len(players) / 30
             sections = [0, 1, 4, 9, 15, 22, 30]
-            peppers = random.choice(ranks)
+            peppers = random.choice(RANKS)
             meal = {}
             for i, pepper in enumerate(peppers):
                 meal[pepper] = players[round(sections[i] * portion): round(sections[i + 1] * portion)]
@@ -977,7 +896,7 @@ class Bot(discord.Client):
             for pepper, players in meal.items():
                 lb.add_field(
                     name=pepper,
-                    value=('```css\n' + "\n".join(players) + '```') if players else '```¯\_(ツ)_/¯```',
+                    value=('```css\n' + "\n".join(players) + '```') if players else '```¯\\_(ツ)_/¯```',
                     inline=False
                 )
 
@@ -1008,7 +927,12 @@ class Bot(discord.Client):
             else:
                 break
 
+    @staticmethod
+    async def unimplemented(message):
+        await message.channel.send(f'{message.author.mention} this command is unimplemented')
+
     async def optimize_talismans(self, message, *args):
+
         user = message.author
         channel = message.channel
 
@@ -1576,10 +1500,68 @@ class Bot(discord.Client):
                 await msg.delete()
                 page_num += result
 
+    @staticmethod
+    async def view_trending(self, message, *args):
+        embed = Embed(
+            message.channel,
+            title='Trending Threads',
+            description=f'It\'s the talk of the town! Here\'s three popular threads from the past {trending_timeout} hours'
+        ).set_footer(
+            text=f'Last updated {last_forums_update[0].strftime(time_format)}'
+        )
+
+        if trending_threads:
+            for thread in trending_threads:
+                embed.add_field(
+                    name=f'**{thread["name"]}\n_{thread["views"]} views_ | _{thread["likes"]} likes_**',
+                    value=f'[{thread["link"]}]'
+                )
+        else:
+            embed.add_field(
+                name=None,
+                value='Hypixel currently has their anti DDOS protection enabled. I can\'t get in!'
+            )
+
+        await embed.send()
+
+    @staticmethod
+    async def api_disabled(self, text, kind, channel):
+        await Embed(
+            channel,
+            title=f'{text}, your **{kind}** is disabled!',
+            description='Re-enable them with [skyblock menu > settings > api settings]'
+        ).set_footer(
+            text='Sometimes this message appears even if your API settings are enabled. If so, exit Hypixel and try again. It\'s also possible that Hypixel\'s API servers are down'
+        ).send()
+
+    @staticmethod
+    async def support_server(self, message, *args):
+        await Embed(
+            message.channel,
+            title='Here\'s a link to my support server',
+            description='[https://discord.gg/8Wbh3p7]'
+        ).set_footer(
+            text='(ﾉ◕ヮ◕)ﾉ*:･ﾟ✧'
+        ).send()
+
+    @staticmethod
+    def craftlink(self, query, *, operation, **kwargs):
+        json = {
+            'operationName': operation,
+            'variables': dict(kwargs),
+            'query': query
+        }
+
+        r = requests.post(f'https://craftlink.xyz/graphql', json=json)
+        r.raise_for_status()
+        r = r.json()
+
+        return r['data']
+
 
 async def update_top_players(player):
     for skill, players in top_players.items():
-        lb = leaderboards[skill]
+        lb = LEADERBOARDS[skill]
         own = lb[1](player)
         if lb[2]:
             await players.insert_one(
@@ -1655,16 +1637,25 @@ async def update_trending():
 
         except (Nothing, RuntimeError):
             now = datetime.now(timezone.utc)
-            await client.log(f'Failed to parse forums at {now.strftime(time_format)}')
+            await client.log(f'Failed to parse forums at {now.strftime(TIME_FORMAT)}')
             trending_threads = backup
 
         await asyncio.sleep(3600 * 2)
 
-discord.Embed = None # Disable default discord Embed
+if os.environ.get('API_KEY') is None:
+    import dotenv
+
+    dotenv.load_dotenv()
+keys = os.getenv('API_KEY').split()
+
+
+client = motor.motor_asyncio.AsyncIOMotorClient(os.getenv('DATABASE_URI'))
+db = client.sbs
+discord.Embed = None  # Disable default discord Embed
 client = Bot()
 
-top_players = {name: db[name] for name in leaderboards.keys()}
-for name in leaderboards.keys():
+top_players = {name: db[name] for name in LEADERBOARDS.keys()}
+for name in LEADERBOARDS.keys():
     client.loop.run_until_complete(db[name].create_index('points', unique=False))
 
 client.loop.create_task(update_trending())
