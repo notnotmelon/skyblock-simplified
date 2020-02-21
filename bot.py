@@ -118,6 +118,23 @@ RANKS = [
     ['PC', 'NINTENDO', 'PLAY STATION', 'XBOX', 'VR', 'MOBILE']
 ]
 
+# List of players that bug abused skills or severely macroed for stats
+EXPLOITERS = [
+    "6c80f48d85544035bb31e6cb9f40b948",  # Farming & Enchanting
+    "04e0ad3f4b7f4815bb39c3888249115c",  # Farming
+    "6ac668e787e74561b86bae8c496d0f97",  # Farming
+    "02bd483c511b4e1fbd0f0c071e2d0411",  # Farming
+    "e91e2680d7da4bc4adbb30c04366f6fa",  # Farming
+    "d14403fd77664905929ee1a6e365e623",  # Enchanting
+    "8f0d1d399aee48f59d5af5f0f69e4eee",  # Enchanting
+    "720d2a83efe446969bc29fbc8c98b31e",  # Enchanting
+    "f33f51a796914076abdaf66e3d047a71",  # Enchanting
+    "73464a378313409d8232076f44074bcf",  # Enchanting
+    "7b488582998f405a84c19ad7a4e9b2e7",  # Enchanting
+    "6170dede383a42a99db6166ca46a8469",  # Combat Macro
+    "6c5b615c2c47428aad137249d37c6fcc",  # Farming Bot
+    "44d03c6e2cba41799ad5c9d2f837d03d"  # Farming Bot
+]
 # list of all enchantment powers per level. can be a function or a number
 ENCHANTMENT_VALUES = {
     # sword always
@@ -493,14 +510,14 @@ class Bot(discord.Client):
         if channel in self.hot_channels and self.hot_channels[channel] == user:
             return
 
-        command = message.content.lower().replace('!', '', 1)
+        command = message.content.replace('!', '', 1)
 
         if command == self.user.mention:
             await self.help(message)
             return
 
         command = re.split('\s+', command)
-
+        command[0] = command[0].lower()
         if command[0] == self.user.mention or command[0] == 'sbs':
             command = command[1:]
         elif not dm:
@@ -602,7 +619,7 @@ class Bot(discord.Client):
             for pepper, players in meal.items():
                 lb.add_field(
                     name=pepper,
-                    value=('```css\n' + '\n'.join(players) + '```') if players else '```¯\_(ツ)_/¯```',
+                    value=('```css\n' + '\n'.join(players) + '```') if players else '```¯\\_(ツ)_/¯```',
                     inline=False
                 )
 
@@ -724,7 +741,7 @@ class Bot(discord.Client):
                         name=f'{item["quantity"]}x {item["name"].upper()}',
                         value=f'```diff\n! {int(auction["highestBidAmount"]):,} coins\n'
                               f'-sold to {buyer}\n'
-                              f'{datetime.fromtimestamp(int(auction["end"]) // 1000).strftime(time_format)}```'
+                              f'{datetime.fromtimestamp(int(auction["end"]) // 1000).strftime(TIME_FORMAT)}```'
                     )
             else:
                 embed.add_field(name=None, value='```¯\\_(ツ)_/¯```')
@@ -772,7 +789,7 @@ class Bot(discord.Client):
                         name=f'{item["quantity"]}x {item["name"].upper()}',
                         value=f'```diff\n! {int(auction["highestBidAmount"]):,} coins\n'
                               f'-by {await skypy.get_uname(auction["seller"])}\n'
-                              f'{datetime.fromtimestamp(int(auction["end"]) // 1000).strftime(time_format)}```'
+                              f'{datetime.fromtimestamp(int(auction["end"]) // 1000).strftime(TIME_FORMAT)}```'
                     )
             else:
                 embed.add_field(name=None, value='```¯\\_(ツ)_/¯```')
@@ -791,7 +808,7 @@ class Bot(discord.Client):
 
         try:
             player = await skypy.Player(keys, uname=args[0], guild=True)
-        except (skypy.BadNameError, skypy.NeverPlayedSkyblockError):
+        except (skypy.BadNameError, skypy.NeverPlayedSkyblockError, Exception):
             await channel.send(f'{user.mention} invalid username!')
             return
 
@@ -803,15 +820,17 @@ class Bot(discord.Client):
             except KeyError:
                 await channel.send(f'{user.mention} invalid profile!')
                 return
-
-        await update_top_players(player)
+        # f'```Skill Average > {round(player.skill_average, 2)}\n'
+        # return f'```Skill Average > {round(player.skill_average, 2)}\n' + f'*' if player.uuid in EXPLOITERS else ''
+        # if cheater_tag:
+        #     pass
 
         embed = Embed(
             channel,
             title=f'{player.uname} | {player.profile_name}',
             description='```' + ' '.join(
                 [f'{k.capitalize()} {"✅" if v else "❌"}' for k, v in player.enabled_api.items()]) + '```\n'
-                                                                                                    f'```Skill Average > {round(player.skill_average, 2)}\n'
+                                                                                                    f'```Skill Average > {round(player.skill_average, 2)}' + (f'*\n' if player.uuid in EXPLOITERS else '\n') +
                                                                                                     f'Deaths > {player.deaths}\n'
                                                                                                     f'Guild > {player.guild}\n'
                                                                                                     f'Money > {round(player.bank_balance + player.purse):,}\n'
@@ -826,7 +845,10 @@ class Bot(discord.Client):
                 value=f'```Level > {optional_function(player)}\nxp: {function(player):,}```'
             )
 
+        if player.uuid in EXPLOITERS:
+            embed.add_field(name="Cheater", value=f'***Player has bug abused or excessively macroed skill(s)**', inline=True)
         await embed.send()
+        await update_top_players(player)
 
 
     async def guild(self, message, *args):
@@ -1500,14 +1522,13 @@ class Bot(discord.Client):
                 await msg.delete()
                 page_num += result
 
-    @staticmethod
     async def view_trending(self, message, *args):
         embed = Embed(
             message.channel,
             title='Trending Threads',
             description=f'It\'s the talk of the town! Here\'s three popular threads from the past {trending_timeout} hours'
         ).set_footer(
-            text=f'Last updated {last_forums_update[0].strftime(time_format)}'
+            text=f'Last updated {last_forums_update[0].strftime(TIME_FORMAT)}'
         )
 
         if trending_threads:
@@ -1585,11 +1606,14 @@ async def update_trending():
         now = None
         backup = trending_threads.copy()
         trending_threads.clear()
-        s = requests.session()
+        import cloudscraper
+        s = cloudscraper.create_scraper()
 
         try:
             while True:
+                break  # Multithread this. Takes too long to start bot
                 await client.log(f'Attempting to parse forums page {pagenumber}')
+
                 soup = BeautifulSoup(
                     s.get(f'https://hypixel.net/forums/skyblock.157/page-{pagenumber}?order=post_date').content,
                     'html.parser',
@@ -1631,7 +1655,7 @@ async def update_trending():
             now = datetime.now(timezone.utc)
             last_forums_update[0] = now
             await client.log(
-                f'Trending threads updated at {now.strftime(time_format)}. {pagenumber} pages parsed\n',
+                f'Trending threads updated at {now.strftime(TIME_FORMAT)}. {pagenumber} pages parsed\n',
                 '\n'.join([thread['link'] for thread in trending_threads])
             )
 
