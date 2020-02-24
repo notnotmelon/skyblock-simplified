@@ -6,3 +6,6 @@ async-timeout==3.0.1
 aiohttp
 sortedcollections
 bs4
+motor
+python-dotenv
+cloudscraper==1.2.24
