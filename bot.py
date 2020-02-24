@@ -13,9 +13,9 @@ import random
 from statistics import mean, median, mode, pstdev, StatisticsError
 from datetime import datetime, timezone
 from bs4 import BeautifulSoup
+import cloudscraper
 
 TIME_FORMAT = '%m/%d %I:%M %p UTC'
-
 
 DAMAGING_POTIONS = {
     'critical': {
@@ -119,22 +119,24 @@ RANKS = [
 ]
 
 # List of players that bug abused skills or severely macroed for stats
-EXPLOITERS = [
-    "6c80f48d85544035bb31e6cb9f40b948",  # Farming & Enchanting
-    "04e0ad3f4b7f4815bb39c3888249115c",  # Farming
-    "6ac668e787e74561b86bae8c496d0f97",  # Farming
-    "02bd483c511b4e1fbd0f0c071e2d0411",  # Farming
-    "e91e2680d7da4bc4adbb30c04366f6fa",  # Farming
-    "d14403fd77664905929ee1a6e365e623",  # Enchanting
-    "8f0d1d399aee48f59d5af5f0f69e4eee",  # Enchanting
-    "720d2a83efe446969bc29fbc8c98b31e",  # Enchanting
-    "f33f51a796914076abdaf66e3d047a71",  # Enchanting
-    "73464a378313409d8232076f44074bcf",  # Enchanting
-    "7b488582998f405a84c19ad7a4e9b2e7",  # Enchanting
-    "6170dede383a42a99db6166ca46a8469",  # Combat Macro
-    "6c5b615c2c47428aad137249d37c6fcc",  # Farming Bot
-    "44d03c6e2cba41799ad5c9d2f837d03d"  # Farming Bot
-]
+EXPLOITERS = {
+    '6c80f48d85544035bb31e6cb9f': ('farming', 'enchanting'),
+    '04e0ad3f4b7f4815bb39c3888249115c': ('farming',),
+    '6ac668e787e74561b86bae8c496d0f97': ('farming',),
+    '02bd483c511b4e1fbd0f0c071e2d0411': ('farming',),
+    'e91e2680d7da4bc4adbb30c04366f6fa': ('farming',),
+    'd14403fd77664905929ee1a6e365e623': ('enchanting',),
+    '8f0d1d399aee48f59d5af5f0f69e4eee': ('enchanting',),
+    '720d2a83efe446969bc29fbc8c98b31e': ('enchanting',),
+    'f33f51a796914076abdaf66e3d047a71': ('enchanting',),
+    '73464a378313409d8232076f44074bcf': ('enchanting',),
+    '7b488582998f405a84c19ad7a4e9b2e7': ('enchanting',),
+    '6170dede383a42a99db6166ca46a8469': ('combat',),    
+    '6c5b615c2c47428aad137249d37c6fcc': ('farming',),   
+    '44d03c6e2cba41799ad5c9d2f837d03d': ('farming',),   
+    '446dea472dd0494b89260421b9981d15': ('combat',)    
+}
+
 # list of all enchantment powers per level. can be a function or a number
 ENCHANTMENT_VALUES = {
     # sword always
@@ -583,31 +585,34 @@ class Bot(discord.Client):
         ).send()
 
     async def royalty(self, message, *args):
+        global db
+        lb = db.leaderboards
+    
         user = message.author
         channel = message.channel
 
-        menu = {}
+        menu = {emoji: name for name, (emoji, _, _, _, _) in LEADERBOARDS.items()}
 
-        for name, (emoji, function, optional_function, _, _) in LEADERBOARDS.items():
-            lb = Embed(
+        current = 'Skill Average'
+        while True:
+            emoji, function, optional_function, _, _ = LEADERBOARDS[current]
+        
+            embed = Embed(
                 channel,
-                title=f'{name} Leaderboard',
+                title=f'{current} Leaderboard',
                 description=None
             )
 
             players = []
-            top = top_players[name]
+            
+            cursor = lb.find().sort(current).limit(50)
+            
             if optional_function:
-                cursor = db.test_collection.find({'i': {'$lt': 5}}).sort('i')
-                # for document in await cursor.to_list(length=100):https://stackoverflow.com/questions/4421207/how-to-get-the-last-n-records-in-mongodb
-                # python -m pip install pymongo[srv]
-                for i in range(min(50, len(top))):
-                    uuid, (name, data, optional) = top.peekitem(i)
-                    players.append(f'#{str(i + 1).ljust(2)} {name} [{round(optional, 3)}] [{round(data, 3):,}]')
+                for d in await cursor.to_list(length=None):
+                    players.append(f'#{str(i + 1).ljust(2)} {d["name"]} [{round(d[current + "_"], 3)}] [{round(d[current], 3):,}]')
             else:
-                for i in range(min(50, len(top))):
-                    uuid, (name, data) = top.peekitem(i)
-                    players.append(f'#{str(i + 1).ljust(2)} {name} [{round(data, 3):,}]')
+                for d in await cursor.to_list(length=None):
+                    players.append(f'#{str(i + 1).ljust(2)} {d["name"]} [{round(d[current], 3):,}]')
 
             portion = len(players) / 30
             sections = [0, 1, 4, 9, 15, 22, 30]
@@ -617,19 +622,15 @@ class Bot(discord.Client):
                 meal[pepper] = players[round(sections[i] * portion): round(sections[i + 1] * portion)]
 
             for pepper, players in meal.items():
-                lb.add_field(
+                embed.add_field(
                     name=pepper,
                     value=('```css\n' + '\n'.join(players) + '```') if players else '```¯\\_(ツ)_/¯```',
                     inline=False
                 )
-
-            menu[emoji] = lb
-
-        embed = menu['📈']
-        while True:
+        
             msg = await embed.send()
-            embed = await self.reaction_menu(msg, user, menu)
-            if embed is None:
+            current = await self.reaction_menu(msg, user, menu)
+            if current is None:
                 break
             await msg.delete()
 
@@ -820,21 +821,18 @@ class Bot(discord.Client):
             except KeyError:
                 await channel.send(f'{user.mention} invalid profile!')
                 return
-        # f'```Skill Average > {round(player.skill_average, 2)}\n'
-        # return f'```Skill Average > {round(player.skill_average, 2)}\n' + f'*' if player.uuid in EXPLOITERS else ''
-        # if cheater_tag:
-        #     pass
+
+        api_header = ' '.join([f'{k.capitalize()} {"✅" if v else "❌"}' for k, v in player.enabled_api.items()])
 
         embed = Embed(
             channel,
             title=f'{player.uname} | {player.profile_name}',
-            description='```' + ' '.join(
-                [f'{k.capitalize()} {"✅" if v else "❌"}' for k, v in player.enabled_api.items()]) + '```\n'
-                                                                                                    f'```Skill Average > {round(player.skill_average, 2)}' + (f'*\n' if player.uuid in EXPLOITERS else '\n') +
-                                                                                                    f'Deaths > {player.deaths}\n'
-                                                                                                    f'Guild > {player.guild}\n'
-                                                                                                    f'Money > {round(player.bank_balance + player.purse):,}\n'
-                                                                                                    f'Slots > {player.minion_slots} ({player.unique_minions} crafts)```'
+            description=f'```{api_header}```\n'
+                        f'```Skill Average > {round(player.skill_average, 2)}{"*" if player.uuid in EXPLOITERS else ""}\n'
+                        f'Deaths > {player.deaths}\n'
+                        f'Guild > {player.guild}\n'
+                        f'Money > {round(player.bank_balance + player.purse):,}\n'
+                        f'Slots > {player.minion_slots} ({player.unique_minions} crafts)```'
         ).set_thumbnail(
             url=player.skin()
         )
@@ -847,6 +845,7 @@ class Bot(discord.Client):
 
         if player.uuid in EXPLOITERS:
             embed.add_field(name="Cheater", value=f'***Player has bug abused or excessively macroed skill(s)**', inline=True)
+            
         await embed.send()
         await update_top_players(player)
 
@@ -1579,21 +1578,38 @@ class Bot(discord.Client):
 
         return r['data']
 
+client = motor.motor_asyncio.AsyncIOMotorClient(os.getenv('DATABASE_URI'))
+db = client.sbs
 
 async def update_top_players(player):
-    for skill, players in top_players.items():
-        lb = LEADERBOARDS[skill]
-        own = lb[1](player)
-        if lb[2]:
-            await players.insert_one(
-                {'uuid': player.uuid, 'name': player.uname, 'points': own, 'optional': lb[2](player)})
-        else:
-            await players.insert_one({'uuid': player.uuid, 'name': player.uname, 'points': own})
+    global db
+    lb = db.leaderboards
+    
+    try:
+        if player.uuid in EXPLOITERS:
+            for offence in EXPLOITERS[player.uuid]:
+                player.skills[offence] *= -1
+            player.skill_average = sum(list(player.skills.values())[0:7]) / 7
+        
+        document = {
+            'name': player.uname,
+            'uuid': player.uuid
+        }
+        
+        for name, (emoji, function, optional_function, _, _) in LEADERBOARDS.items():
+            document[name] = function(player)
+            if optional_function:
+                document[f'{name}_'] = optional_function(player)
+    except AttributeError:
+        await client.log(f'Failed to add {player.uname} to leaderboards')
+        return
+    
+    #await lb.replace_one({'uuid': player.uuid}, document, upsert=True)
+    #await client.log(f'Leaderboard updated for {player.uname}')
 
-
-async def update_trending():
-    global trending_threads
-    global last_forums_update
+def update_trending():
+    global trending_threads, last_forums_update
+    loop = asyncio.new_event_loop()
 
     class Timeout(Exception):
         pass
@@ -1606,13 +1622,11 @@ async def update_trending():
         now = None
         backup = trending_threads.copy()
         trending_threads.clear()
-        import cloudscraper
         s = cloudscraper.create_scraper()
 
         try:
             while True:
-                break  # Multithread this. Takes too long to start bot
-                await client.log(f'Attempting to parse forums page {pagenumber}')
+                loop.run_until_complete(client.log(f'Attempting to parse forums page {pagenumber}'))
 
                 soup = BeautifulSoup(
                     s.get(f'https://hypixel.net/forums/skyblock.157/page-{pagenumber}?order=post_date').content,
@@ -1654,17 +1668,17 @@ async def update_trending():
         except Timeout:
             now = datetime.now(timezone.utc)
             last_forums_update[0] = now
-            await client.log(
+            loop.run_until_complete(client.log(
                 f'Trending threads updated at {now.strftime(TIME_FORMAT)}. {pagenumber} pages parsed\n',
                 '\n'.join([thread['link'] for thread in trending_threads])
-            )
+            ))
 
         except (Nothing, RuntimeError):
             now = datetime.now(timezone.utc)
-            await client.log(f'Failed to parse forums at {now.strftime(TIME_FORMAT)}')
+            loop.run_until_complete(client.log(f'Failed to parse forums at {now.strftime(TIME_FORMAT)}'))
             trending_threads = backup
-
-        await asyncio.sleep(3600 * 2)
+            
+        loop.run_until_complete(asyncio.sleep(3600 * 2))
 
 if os.environ.get('API_KEY') is None:
     import dotenv
@@ -1672,15 +1686,7 @@ if os.environ.get('API_KEY') is None:
     dotenv.load_dotenv()
 keys = os.getenv('API_KEY').split()
 
-
-client = motor.motor_asyncio.AsyncIOMotorClient(os.getenv('DATABASE_URI'))
-db = client.sbs
 discord.Embed = None  # Disable default discord Embed
 client = Bot()
-
-top_players = {name: db[name] for name in LEADERBOARDS.keys()}
-for name in LEADERBOARDS.keys():
-    client.loop.run_until_complete(db[name].create_index('points', unique=False))
-
-client.loop.create_task(update_trending())
+client.loop.run_in_executor(None, update_trending)
 client.run(os.getenv('DISCORD_TOKEN'))
