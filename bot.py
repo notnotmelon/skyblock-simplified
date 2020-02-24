@@ -1604,8 +1604,8 @@ async def update_top_players(player):
         await client.log(f'Failed to add {player.uname} to leaderboards')
         return
     
-    #await lb.replace_one({'uuid': player.uuid}, document, upsert=True)
-    #await client.log(f'Leaderboard updated for {player.uname}')
+    await lb.replace_one({'uuid': player.uuid}, document, upsert=True)
+    await client.log(f'Leaderboard updated for {player.uname}')
 
 def update_trending():
     global trending_threads, last_forums_update
