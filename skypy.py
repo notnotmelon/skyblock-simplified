@@ -736,7 +736,7 @@ class Player(ApiInterface):
 		stats = {}		
 		for armor in self.armor:
 			for stat, amount in armor.stats().items():
-				stats[stat] = stats.get(stat, 0) + amount * multiplier
+				stats[stat] = stats.get(stat, 0) + amount
 		return stats
 
 	def stat_modifiers(self):
