@@ -607,7 +607,9 @@ class Bot(discord.Client):
             return
         
         query = 'query Auctions($seller: String) { auctions(seller: $seller) { auction { id highestBidAmount startingBid itemName itemBytes bids { amount bidder timestamp } itemData { name lore id quantity tag } end }}}'
-        r = craftlink(query, operation='Auctions', seller=uuid)['data']['auctions']['auction']
+        r = craftlink(query, operation='Auctions', seller=uuid)
+        print(r)
+        r = r['data']['auctions']['auction']
                 
         embed = Embed(
             channel,
@@ -634,7 +636,7 @@ class Bot(discord.Client):
                     embed.add_field(
                         name=f'{item["quantity"]}x {item["name"].upper()}',
                         value=f'```diff\n! {int(auction["startingBid"]):,} coins\n'
-                              f'-❌ this auction has no bids!'
+                              f'❌ -this auction has no bids!'
                               f'ends in {time_until(int(auction["end"]) // 1000)}```'
                     )
         else:
