@@ -621,7 +621,7 @@ class Bot(discord.Client):
             for auction in r:
                 item = auction['itemData']
                 
-                if auction['bids']
+                if auction['bids']:
                     buyer = await skypy.get_uname(auction['bids'][0]['bidder'])
 
                     embed.add_field(
