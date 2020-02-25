@@ -612,7 +612,7 @@ class Bot(discord.Client):
         embed = Embed(
             channel,
             title=f'Current Auctions From {name}',
-            description=f'Page {page_num + 1} | Powered by https://hypixel-skyblock.com'
+            description=f'Powered by https://hypixel-skyblock.com'
         )
 
         if r:
