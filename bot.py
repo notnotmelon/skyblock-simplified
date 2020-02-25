@@ -16,6 +16,11 @@ from bs4 import BeautifulSoup
 import cloudscraper
 
 TIME_FORMAT = '%m/%d %I:%M %p UTC'
+def time_until(goal):
+    now = datetime.now(timezone.utc)
+    then = datetime.fromtimestamp(goal)
+    delta = then - now
+    return 'wip'
 
 DAMAGING_POTIONS = {
     'critical': {
@@ -268,16 +273,11 @@ RELEVANT_REFORGES = {
     'forceful': (None, None, (7, 0, 0), None, None),
     'itchy': ((1, 0, 3), (2, 0, 5), (2, 0, 8), (3, 0, 12), (5, 0, 15)),
     'strong': (None, None, (4, 0, 4), (7, 0, 7), (10, 0, 10)),
-    'godly': (None, None, (4, 2, 3), (7, 3, 6), (10, 5, 8))
+    'godly': ((1, 1, 1), (2, 2, 2), (4, 2, 3), (7, 3, 6), (10, 5, 8))
 }
 reforges_list = list(RELEVANT_REFORGES.values())
 
-# Forums parsing ---
-trending_threads = []
-last_forums_update = [datetime.now()]
-num_trending = 3
-trending_timeout = 24
-
+CLOSE_MESSAGE = '\n> _use **exit** to close the session_'
 
 class Embed(discord.Embed):
     nbst = '\u200b'
@@ -319,10 +319,10 @@ class Route:
         self.rarity_str = ["common", "uncommon", "rare", "epic", "legendary"][self.rarity]
 
     def __repr__(self):
-        return ', '.join([f'{c} '
+        return ', '.join(f'{c} '
                           f'{"godly/zealous" if self.rarity < 2 and name == "godly" else name} '
-                          f'{rarity_grammar(self.rarity_str, c)}'
-                          for name, c in zip(relavant_reforges.keys(), self.counts) if c != 0])
+                          f'{Route.rarity_grammar(self.rarity_str, c)}'
+                          for name, c in zip(RELEVANT_REFORGES.keys(), self.counts) if c != 0)
 
     @staticmethod
     def routes(count, size, rarity):
@@ -474,6 +474,11 @@ class Bot(discord.Client):
                         'args': '[username]',
                         'function': self.sells,
                         'desc': 'Displays all past purchases for any player'
+                    },
+                    'current': {
+                        'args': '[username]',
+                        'function': self.current_auctions,
+                        'desc': 'Displays all current auctions'
                     }
                 }
             }
@@ -520,7 +525,7 @@ class Bot(discord.Client):
 
         command = re.split('\s+', command)
         command[0] = command[0].lower()
-        if command[0] == self.user.mention or command[0] == 'sbs':
+        if command[0] == self.user.mention or command[0].lower() == 'sbs':
             command = command[1:]
         elif not dm:
             return
@@ -544,8 +549,10 @@ class Bot(discord.Client):
             ).set_footer(
                 text='Free for servers under 50 members'
             ).send()
+            await self.log('Paywal enforced in server {guild.name}')
             return
         '''
+        
         data = self.callables[name]
         security = data['security'] if 'security' in data else 0
         session = 'session' in data and data['session']
@@ -576,13 +583,64 @@ class Bot(discord.Client):
 
     async def no_args(self, command, user, channel):
         data = self.callables[command]
-        usage = f'{command} {data["args"]}' if 'args' in data else command
+        usage = f'sbs {command} {data["args"]}' if 'args' in data else command
 
         await Embed(
             channel,
             title='This command requires arguments!',
             description=f'Correct usage is `{usage}`\n{self.args_message}'
         ).send()
+
+    async def current_auctions(self, message, *args):
+        user = message.author
+        channel = message.channel
+        
+        if not args:
+            await self.no_args('current', user, channel)
+            return
+
+        name = args[0]
+        try:
+            uuid = await skypy.get_uuid(name)
+        except skypy.BadNameError:
+            await channel.send(f'{user.mention} invalid username!')
+            return
+        
+        query = 'query Auctions($seller: String) { auctions(seller: $seller) { auction { id highestBidAmount startingBid itemName itemBytes bids { amount bidder timestamp } itemData { name lore id quantity tag } end }}}'
+        r = craftlink(query, operation='Auctions', seller=uuid)['auctions']['auction']
+                
+        embed = Embed(
+            channel,
+            title=f'Current Auctions From {name}',
+            description=f'Powered by https://hypixel-skyblock.com'
+        )
+
+        if r:
+            now = time.time()
+        
+            for auction in r:
+                item = auction['itemData']
+                
+                if auction['bids']:
+                    buyer = await skypy.get_uname(auction['bids'][0]['bidder'])
+
+                    embed.add_field(
+                        name=f'{item["quantity"]}x {item["name"].upper()}',
+                        value=f'```diff\n! {int(auction["highestBidAmount"]):,} coins\n'
+                              f'-bidder: {buyer}\n'
+                              f'ends in {time_until(int(auction["end"]) // 1000)}```'
+                    )
+                else:
+                    embed.add_field(
+                        name=f'{item["quantity"]}x {item["name"].upper()}',
+                        value=f'```diff\n! {int(auction["startingBid"]):,} coins\n'
+                              f'❌ -this auction has no bids!'
+                              f'ends in {time_until(int(auction["end"]) // 1000)}```'
+                    )
+        else:
+            embed.add_field(name=None, value='```❌ no auctions found```')
+            
+        await embed.send()
 
     async def royalty(self, message, *args):
         global db
@@ -605,18 +663,21 @@ class Bot(discord.Client):
 
             players = []
             
-            cursor = lb.find().sort(current).limit(50)
+            cursor = lb.find().sort(current, -1).limit(50)
             
+            i = 0
             if optional_function:
                 for d in await cursor.to_list(length=None):
                     players.append(f'#{str(i + 1).ljust(2)} {d["name"]} [{round(d[current + "_"], 3)}] [{round(d[current], 3):,}]')
+                    i += 1
             else:
                 for d in await cursor.to_list(length=None):
                     players.append(f'#{str(i + 1).ljust(2)} {d["name"]} [{round(d[current], 3):,}]')
+                    i += 1
 
             portion = len(players) / 30
             sections = [0, 1, 4, 9, 15, 22, 30]
-            peppers = random.choice(ranks)
+            peppers = random.choice(RANKS)
             meal = {}
             for i, pepper in enumerate(peppers):
                 meal[pepper] = players[round(sections[i] * portion): round(sections[i + 1] * portion)]
@@ -650,7 +711,7 @@ class Bot(discord.Client):
             itemname = ' '.join(args).title()
 
         query = 'query ItemsList($page: Int, $items: Int, $name: String) { itemList(page: $page, items: $items, name: $name) { page item { name }}}'
-        r = self.craftlink(query, operation='ItemsList', name=itemname, items=1, page=1)['itemList']['item']
+        r = craftlink(query, operation='ItemsList', name=itemname, items=1, page=1)['itemList']['item']
 
         if not r:
             await channel.send(f'{user.mention} invalid itemname')
@@ -659,7 +720,7 @@ class Bot(discord.Client):
         itemname = r[0]['name']
 
         query = 'query Item($name: String) { item(name: $name) { sales { end price } recent { id seller itemData { quantity lore } bids { bidder timestamp amount } highestBidAmount end } }}'
-        r = self.craftlink(query, operation='Item', name=itemname)['item']
+        r = craftlink(query, operation='Item', name=itemname)['item']
         sales = r['sales']
 
         if stacksize is None:
@@ -719,7 +780,7 @@ class Bot(discord.Client):
 
         async def pages(page_num):
             query = 'query UserHistory($id: String, $type: String, $limit: Int, $skip: Int) { userHistory(id: $id, type: $type, limit: $limit, skip: $skip) { auctions { id seller itemData { texture id name tag quantity lore __typename } bids { bidder timestamp amount __typename } highestBidAmount end __typename } __typename } }'
-            r = self.craftlink(query, operation='UserHistory', id=uuid, limit=page_size, skip=page_num * page_size,
+            r = craftlink(query, operation='UserHistory', id=uuid, limit=page_size, skip=page_num * page_size,
                                type='auctions')['userHistory']['auctions']
 
             if len(r) < page_size:
@@ -766,10 +827,11 @@ class Bot(discord.Client):
             uuid = await skypy.get_uuid(name)
         except skypy.BadNameError:
             await channel.send(f'{user.mention} invalid username!')
+            return
 
         async def pages(page_num):
             query = 'query UserHistory($id: String, $type: String, $limit: Int, $skip: Int) {userHistory(id: $id, type: $type, limit: $limit, skip: $skip) {auctions {id seller itemData {texture id name tag quantity lore __typename} bids {bidder timestamp amount __typename} highestBidAmount end __typename} __typename}}'
-            r = self.craftlink(query, operation='UserHistory', id=uuid, limit=page_size, skip=page_num * page_size,
+            r = craftlink(query, operation='UserHistory', id=uuid, limit=page_size, skip=page_num * page_size,
                                type='purchases')['userHistory']['auctions']
 
             if len(r) < page_size:
@@ -822,7 +884,7 @@ class Bot(discord.Client):
                 await channel.send(f'{user.mention} invalid profile!')
                 return
 
-        api_header = ' '.join([f'{k.capitalize()} {"✅" if v else "❌"}' for k, v in player.enabled_api.items()])
+        api_header = ' '.join(f'{k.capitalize()} {"✅" if v else "❌"}' for k, v in player.enabled_api.items())
 
         embed = Embed(
             channel,
@@ -956,8 +1018,7 @@ class Bot(discord.Client):
 
         user = message.author
         channel = message.channel
-
-        close_message = '\n> _use **exit** to close the session_'
+        
         valid = False
         while valid is False:
             await channel.send(f'{user.mention} what is your Minecraft username?')
@@ -970,18 +1031,16 @@ class Bot(discord.Client):
             try:
                 player = await skypy.Player(keys, uname=msg)
                 if len(player.profiles) == 0:
-                    await channel.send(f'You have no profiles? Please report this{close_message}')
+                    await channel.send(f'You have no profiles? Please report this{CLOSE_MESSAGE}')
 
                 else:
                     valid = True
 
             except skypy.NeverPlayedSkyblockError:
-                await channel.send(f'You have never played skyblock{close_message}')
-                return
+                await channel.send(f'You have never played skyblock{CLOSE_MESSAGE}')
 
             except skypy.BadNameError:
-                await channel.send(f'Invalid username!{close_message}')
-                return
+                await channel.send(f'Invalid username!{CLOSE_MESSAGE}')
 
         if len(player.profiles) == 1:
             await player.set_profile(list(player.profiles.values())[0])
@@ -1011,11 +1070,16 @@ class Bot(discord.Client):
                     valid = True
 
                 else:
-                    await channel.send(f'Invalid profile! Did you make a typo?{close_message}')
+                    await channel.send(f'Invalid profile! Did you make a typo?{CLOSE_MESSAGE}')
 
-        if len(player.weapons) == 0:
-            await channel.send(f'{user.mention} you have no weapons')
+        if player.enabled_api['skills'] is False or player.enabled_api['inventory'] is False:
+            await self.api_disabled(user.name, 'API', channel)
             return
+        
+        if len(player.weapons) == 0:
+            await channel.send(f'{user.mention} you have `no weapons` in your inventory')
+            return
+            
         if len(player.weapons) == 1:
             weapon = player.weapons[0]
         else:
@@ -1047,7 +1111,7 @@ class Bot(discord.Client):
                         weapon = player.weapons[int(msg) - 1]
                         valid = True
                     except (IndexError, TypeError, ValueError):
-                        await channel.send(f'Invalid weapon! Did you make a typo?{close_message}')
+                        await channel.send(f'Invalid weapon! Did you make a typo?{CLOSE_MESSAGE}')
 
         embed = Embed(
             channel,
@@ -1067,7 +1131,7 @@ class Bot(discord.Client):
 
         for name, amount in player.talisman_counts().items():
             if amount:
-                embed.add_field(name=rarity_grammar(name).capitalize(), value=amount)
+                embed.add_field(name=Route.rarity_grammar(name).capitalize(), value=amount)
 
         if not await self.yesno(await embed.send(), user):
             return
@@ -1076,7 +1140,7 @@ class Bot(discord.Client):
 
         stats = {'crit damage': 0, 'crit chance': 0, 'strength': 0, 'enchantment modifier': 0, 'damage': 0}
 
-        for name, pot in damaging_potions.items():
+        for name, pot in DAMAGING_POTIONS.items():
             buff = pot['stats']
             levels = pot['levels']
 
@@ -1096,7 +1160,7 @@ class Bot(discord.Client):
             for name1, amount in buff.items():
                 stats[name1] += amount[level]
 
-        for name, orb in orbs.items():
+        for name, orb in ORBS.items():
             internal_name = orb['internal']
             buff = orb['stats']
 
@@ -1104,9 +1168,7 @@ class Bot(discord.Client):
                 msg = await channel.send(f'{user.mention} will you be using your `{name}`?')
                 yn = await self.yesno(msg, user)
 
-                if yn is None:
-                    return
-                elif yn is True:
+                if yn is True:
                     for name, amount in buff.items():
                         stats[name] += amount
 
@@ -1145,7 +1207,7 @@ class Bot(discord.Client):
             cc_mod = stat_modifiers.get('crit chance', None)
             if cc_mod:
                 for c, u, r, e, l in itertools.product(
-                        *[routes(counts[key], 4, rarity_num) for rarity_num, key in enumerate(counts.keys())]):
+                        *[Route.routes(counts[key], 4, rarity_num) for rarity_num, key in enumerate(counts.keys())]):
                     crit_chance = cc_mod(
                         base_cc + c.crit_chance + u.crit_chance + r.crit_chance + e.crit_chance + l.crit_chance) // 1
                     if crit_chance >= 100:
@@ -1164,7 +1226,7 @@ class Bot(discord.Client):
                             best_cd = crit_damage
             else:
                 for c, u, r, e, l in itertools.product(
-                        *[routes(counts[key], 4, rarity_num) for rarity_num, key in enumerate(counts.keys())]):
+                        *[Route.routes(counts[key], 4, rarity_num) for rarity_num, key in enumerate(counts.keys())]):
                     crit_chance = base_cc + c.crit_chance + u.crit_chance + r.crit_chance + e.crit_chance + l.crit_chance
                     if crit_chance >= 100:
                         strength = str_mod(base_str + c.strength + u.strength + r.strength + e.strength + l.strength)
@@ -1182,7 +1244,7 @@ class Bot(discord.Client):
                             best_cd = crit_damage
         else:
             for c, u, r, e, l in itertools.product(
-                    *[routes(counts[key], 4, rarity_num) for rarity_num, key in enumerate(counts.keys())]):
+                    *[Route.routes(counts[key], 4, rarity_num) for rarity_num, key in enumerate(counts.keys())]):
                 strength = str_mod(base_str + c.strength + u.strength + r.strength + e.strength + l.strength)
                 crit_damage = cd_mod(
                     base_cd + c.crit_damage + u.crit_damage + r.crit_damage + e.crit_damage + l.crit_damage, strength)
@@ -1206,7 +1268,7 @@ class Bot(discord.Client):
             return
 
         await channel.send(str(best_route))
-
+        
     async def calculate_damage(self, message, *args):
         channel = message.channel
         user = message.author
@@ -1233,7 +1295,7 @@ class Bot(discord.Client):
                 return
             stats[stat] = int(resp.content)
 
-        mobs = '\n'.join([k.capitalize() for k in activities.keys()])
+        mobs = '\n'.join([k.capitalize() for k in ACTIVITIES.keys()])
 
         embed = Embed(
             channel,
@@ -1251,20 +1313,20 @@ class Bot(discord.Client):
                 return
             resp = resp.content.lower()
 
-            if resp in activities:
+            if resp in ACTIVITIES:
                 break
             else:
-                await channel.send(f'{user.mention} choose one of the listed enemies{close_message}')
+                await channel.send(f'{user.mention} choose one of the listed enemies{CLOSE_MESSAGE}')
 
         msg = await channel.send(
             f'{user.mention} do you want to use **level 5** or **level 6** enchantments? **[react to this message]**')
-        enchant_levels = await self.reaction_menu(msg, user, {'5️⃣': cheapo_levels, '6️⃣': max_levels})
+        enchant_levels = await self.reaction_menu(msg, user, {'5️⃣': CHEAP_MAX_BOOK_LEVELS, '6️⃣': MAX_BOOK_LEVELS})
         if enchant_levels is None:
             return
 
         modifier = stats['combat level'] * 4
-        for enchantment in activities[resp]:
-            perk = enchantment_values[enchantment]
+        for enchantment in ACTIVITIES[resp]:
+            perk = ENCHANTMENT_VALUES[enchantment]
             if isinstance(perk, int):
                 modifier += perk * enchant_levels[enchantment]
             else:
@@ -1419,11 +1481,11 @@ class Bot(discord.Client):
             title='Discord Stats'
         ).add_field(
             name='Servers',
-            value=f'{self.user.name} is running in {len(self.guilds)} servers with {sum([len(guild.text_channels) for guild in self.guilds])} channels\n```{server_rankings}```',
+            value=f'{self.user.name} is running in {len(self.guilds)} servers with {sum(len(guild.text_channels) for guild in self.guilds)} channels\n```{server_rankings}```',
             inline=False
         ).add_field(
             name='Users',
-            value=f'There are currently {sum([len(guild.members) for guild in self.guilds])} users with access to the bot',
+            value=f'There are currently {sum(len(guild.members) for guild in self.guilds)} users with access to the bot',
             inline=False
         ).add_field(
             name='Heartbeat',
@@ -1493,7 +1555,8 @@ class Bot(discord.Client):
             while True:
                 if page_num == 0 and last_page is True:
                     return
-                elif page_num == 0:
+                
+                if page_num == 0:
                     result = await self.reaction_menu(msg, user, forward, edit=True)
                 elif last_page is True:
                     result = await self.reaction_menu(msg, user, backward, edit=True)
@@ -1510,7 +1573,8 @@ class Bot(discord.Client):
                 msg = await embed.send()
                 if page_num == 0 and last_page is True:
                     return
-                elif page_num == 0:
+                    
+                if page_num == 0:
                     result = await self.reaction_menu(msg, user, forward, edit=False)
                 elif last_page is True:
                     result = await self.reaction_menu(msg, user, backward, edit=False)
@@ -1525,9 +1589,9 @@ class Bot(discord.Client):
         embed = Embed(
             message.channel,
             title='Trending Threads',
-            description=f'It\'s the talk of the town! Here\'s three popular threads from the past {trending_timeout} hours'
+            description=f'It\'s the talk of the town! Here\'s six popular threads from the past {trending_timeout} hours'
         ).set_footer(
-            text=f'Last updated {last_forums_update[0].strftime(TIME_FORMAT)}'
+            text=f'Last updated {last_forums_update.strftime(TIME_FORMAT)}'
         )
 
         if trending_threads:
@@ -1544,7 +1608,6 @@ class Bot(discord.Client):
 
         await embed.send()
 
-    @staticmethod
     async def api_disabled(self, text, kind, channel):
         await Embed(
             channel,
@@ -1554,7 +1617,6 @@ class Bot(discord.Client):
             text='Sometimes this message appears even if your API settings are enabled. If so, exit Hypixel and try again. It\'s also possible that Hypixel\'s API servers are down'
         ).send()
 
-    @staticmethod
     async def support_server(self, message, *args):
         await Embed(
             message.channel,
@@ -1564,19 +1626,18 @@ class Bot(discord.Client):
             text='(ﾉ◕ヮ◕)ﾉ*:･ﾟ✧'
         ).send()
 
-    @staticmethod
-    def craftlink(self, query, *, operation, **kwargs):
-        json = {
-            'operationName': operation,
-            'variables': dict(kwargs),
-            'query': query
-        }
+def craftlink(query, *, operation, **kwargs):
+    json = {
+        'operationName': operation,
+        'variables': dict(kwargs),
+        'query': query
+    }
 
-        r = requests.post(f'https://craftlink.xyz/graphql', json=json)
-        r.raise_for_status()
-        r = r.json()
+    r = requests.post(f'https://craftlink.xyz/graphql', json=json)
+    r.raise_for_status()
+    r = r.json()
 
-        return r['data']
+    return r['data']
 
 client = motor.motor_asyncio.AsyncIOMotorClient(os.getenv('DATABASE_URI'))
 db = client.sbs
@@ -1606,6 +1667,14 @@ async def update_top_players(player):
     
     await lb.replace_one({'uuid': player.uuid}, document, upsert=True)
     await client.log(f'Leaderboard updated for {player.uname}')
+
+# Forums parsing ---
+trending_threads = []
+last_forums_update = datetime.now()
+num_trending = 6
+trending_timeout = 24
+def trending_algorithm(thread):
+    return (thread['views'] + thread['likes'] * 200) / math.sqrt(thread['date'] / 1000 + 1)
 
 def update_trending():
     global trending_threads, last_forums_update
@@ -1659,15 +1728,13 @@ def update_trending():
 
                     if discord.utils.find(lambda t: thread['link'] == t['link'], trending_threads) is None:
                         trending_threads.append(thread)
-                        trending_algorithm = lambda thread: (thread['views'] + thread['likes'] * 200) / math.sqrt(
-                            thread['date'] / 1000 + 1)
                         trending_threads.sort(key=trending_algorithm, reverse=True)
                         del trending_threads[num_trending:]
                 pagenumber += 1
 
         except Timeout:
             now = datetime.now(timezone.utc)
-            last_forums_update[0] = now
+            last_forums_update = now
             loop.run_until_complete(client.log(
                 f'Trending threads updated at {now.strftime(TIME_FORMAT)}. {pagenumber} pages parsed\n',
                 '\n'.join([thread['link'] for thread in trending_threads])
