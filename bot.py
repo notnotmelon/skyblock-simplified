@@ -583,7 +583,7 @@ class Bot(discord.Client):
 
     async def no_args(self, command, user, channel):
         data = self.callables[command]
-        usage = f'{command} {data["args"]}' if 'args' in data else command
+        usage = f'sbs {command} {data["args"]}' if 'args' in data else command
 
         await Embed(
             channel,
@@ -607,9 +607,7 @@ class Bot(discord.Client):
             return
         
         query = 'query Auctions($seller: String) { auctions(seller: $seller) { auction { id highestBidAmount startingBid itemName itemBytes bids { amount bidder timestamp } itemData { name lore id quantity tag } end }}}'
-        r = craftlink(query, operation='Auctions', seller=uuid)
-        print(r)
-        r = r['data']['auctions']['auction']
+        r = craftlink(query, operation='Auctions', seller=uuid)['auctions']['auction']
                 
         embed = Embed(
             channel,
