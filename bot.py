@@ -628,14 +628,14 @@ class Bot(discord.Client):
                         name=f'{item["quantity"]}x {item["name"].upper()}',
                         value=f'```diff\n! {int(auction["highestBidAmount"]):,} coins\n'
                               f'-bidder: {buyer}\n'
-                              f'ends in {time_until(int(auction["end"]) // 1000))}```'
+                              f'ends in {time_until(int(auction["end"]) // 1000)}```'
                     )
                 else:
                     embed.add_field(
                         name=f'{item["quantity"]}x {item["name"].upper()}',
                         value=f'```diff\n! {int(auction["startingBid"]):,} coins\n'
                               f'-❌ this auction has no bids!'
-                              f'ends in {time_until(int(auction["end"]) // 1000))}```'
+                              f'ends in {time_until(int(auction["end"]) // 1000)}```'
                     )
         else:
             embed.add_field(name=None, value='```❌ no auctions found```')
