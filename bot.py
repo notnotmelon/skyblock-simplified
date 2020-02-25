@@ -272,6 +272,8 @@ RELEVANT_REFORGES = {
 }
 reforges_list = list(RELEVANT_REFORGES.values())
 
+close_message = '\n> _use **exit** to close the session_'
+
 class Embed(discord.Embed):
     nbst = '\u200b'
 
@@ -600,7 +602,7 @@ class Bot(discord.Client):
 
             players = []
             
-            cursor = lb.find().sort(current).limit(50)
+            cursor = lb.find().sort({current: -1}).limit(50)
             
             i = 0
             if optional_function:
@@ -955,8 +957,7 @@ class Bot(discord.Client):
 
         user = message.author
         channel = message.channel
-
-        close_message = '\n> _use **exit** to close the session_'
+        
         valid = False
         while valid is False:
             await channel.send(f'{user.mention} what is your Minecraft username?')
@@ -969,16 +970,16 @@ class Bot(discord.Client):
             try:
                 player = await skypy.Player(keys, uname=msg)
                 if len(player.profiles) == 0:
-                    await channel.send(f'You have no profiles? Please report this{close_message}')
+                    await channel.send(f'You have no profiles? Please report this{CLOSE_MESSAGE}')
 
                 else:
                     valid = True
 
             except skypy.NeverPlayedSkyblockError:
-                await channel.send(f'You have never played skyblock{close_message}')
+                await channel.send(f'You have never played skyblock{CLOSE_MESSAGE}')
 
             except skypy.BadNameError:
-                await channel.send(f'Invalid username!{close_message}')
+                await channel.send(f'Invalid username!{CLOSE_MESSAGE}')
 
         if len(player.profiles) == 1:
             await player.set_profile(list(player.profiles.values())[0])
@@ -1008,7 +1009,7 @@ class Bot(discord.Client):
                     valid = True
 
                 else:
-                    await channel.send(f'Invalid profile! Did you make a typo?{close_message}')
+                    await channel.send(f'Invalid profile! Did you make a typo?{CLOSE_MESSAGE}')
 
         if player.enabled_api['skills'] is False or player.enabled_api['inventory'] is False:
             await self.api_disabled(user.name, 'API', channel)
@@ -1049,7 +1050,7 @@ class Bot(discord.Client):
                         weapon = player.weapons[int(msg) - 1]
                         valid = True
                     except (IndexError, TypeError, ValueError):
-                        await channel.send(f'Invalid weapon! Did you make a typo?{close_message}')
+                        await channel.send(f'Invalid weapon! Did you make a typo?{CLOSE_MESSAGE}')
 
         embed = Embed(
             channel,
@@ -1254,7 +1255,7 @@ class Bot(discord.Client):
             if resp in ACTIVITIES:
                 break
             else:
-                await channel.send(f'{user.mention} choose one of the listed enemies{close_message}')
+                await channel.send(f'{user.mention} choose one of the listed enemies{CLOSE_MESSAGE}')
 
         msg = await channel.send(
             f'{user.mention} do you want to use **level 5** or **level 6** enchantments? **[react to this message]**')
