@@ -602,7 +602,7 @@ class Bot(discord.Client):
 
             players = []
             
-            cursor = lb.find().sort({current: -1}).limit(50)
+            cursor = lb.find().sort(current, -1).limit(50)
             
             i = 0
             if optional_function:
