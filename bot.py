@@ -537,8 +537,10 @@ class Bot(discord.Client):
             ).set_footer(
                 text='Free for servers under 50 members'
             ).send()
+            await self.log('Paywal enforced in server {guild.name}')
             return
         '''
+        
         data = self.callables[name]
         security = data['security'] if 'security' in data else 0
         session = 'session' in data and data['session']
@@ -612,7 +614,7 @@ class Bot(discord.Client):
 
             portion = len(players) / 30
             sections = [0, 1, 4, 9, 15, 22, 30]
-            peppers = random.choice(ranks)
+            peppers = random.choice(RANKS)
             meal = {}
             for i, pepper in enumerate(peppers):
                 meal[pepper] = players[round(sections[i] * portion): round(sections[i + 1] * portion)]
