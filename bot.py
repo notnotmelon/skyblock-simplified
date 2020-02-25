@@ -600,12 +600,15 @@ class Bot(discord.Client):
             
             cursor = lb.find().sort(current).limit(50)
             
+            i = 0
             if optional_function:
                 for d in await cursor.to_list(length=None):
                     players.append(f'#{str(i + 1).ljust(2)} {d["name"]} [{round(d[current + "_"], 3)}] [{round(d[current], 3):,}]')
+                    i += 1
             else:
                 for d in await cursor.to_list(length=None):
                     players.append(f'#{str(i + 1).ljust(2)} {d["name"]} [{round(d[current], 3):,}]')
+                    i += 1
 
             portion = len(players) / 30
             sections = [0, 1, 4, 9, 15, 22, 30]
