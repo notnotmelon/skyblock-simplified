@@ -16,6 +16,11 @@ from bs4 import BeautifulSoup
 import cloudscraper
 
 TIME_FORMAT = '%m/%d %I:%M %p UTC'
+def time_until(goal):
+    now = datetime.now(timezone.utc)
+    then = datetime.fromtimestamp(goal)
+    delta = then - now
+    return 'wip'
 
 DAMAGING_POTIONS = {
     'critical': {
@@ -272,7 +277,7 @@ RELEVANT_REFORGES = {
 }
 reforges_list = list(RELEVANT_REFORGES.values())
 
-close_message = '\n> _use **exit** to close the session_'
+CLOSE_MESSAGE = '\n> _use **exit** to close the session_'
 
 class Embed(discord.Embed):
     nbst = '\u200b'
@@ -469,6 +474,11 @@ class Bot(discord.Client):
                         'args': '[username]',
                         'function': self.sells,
                         'desc': 'Displays all past purchases for any player'
+                    },
+                    'current': {
+                        'args': '[username]',
+                        'function': self.current_auctions,
+                        'desc': 'Displays all current auctions'
                     }
                 }
             }
@@ -580,6 +590,57 @@ class Bot(discord.Client):
             title='This command requires arguments!',
             description=f'Correct usage is `{usage}`\n{self.args_message}'
         ).send()
+
+    async def current_auctions(self, message, *args):
+        user = message.author
+        channel = message.channel
+        
+        if not args:
+            await self.no_args('current', user, channel)
+            return
+
+        name = args[0]
+        try:
+            uuid = await skypy.get_uuid(name)
+        except skypy.BadNameError:
+            await channel.send(f'{user.mention} invalid username!')
+            return
+        
+        query = 'query Auctions($seller: String) { auctions(seller: $seller) { auction { id highestBidAmount startingBid itemName itemBytes bids { amount bidder timestamp } itemData { name lore id quantity tag } end }}}'
+        r = craftlink(query, operation='Auctions', seller=uuid)['data']['auctions']['auction']
+                
+        embed = Embed(
+            channel,
+            title=f'Current Auctions From {name}',
+            description=f'Page {page_num + 1} | Powered by https://hypixel-skyblock.com'
+        )
+
+        if r:
+            now = time.time()
+        
+            for auction in r:
+                item = auction['itemData']
+                
+                if auction['bids']
+                    buyer = await skypy.get_uname(auction['bids'][0]['bidder'])
+
+                    embed.add_field(
+                        name=f'{item["quantity"]}x {item["name"].upper()}',
+                        value=f'```diff\n! {int(auction["highestBidAmount"]):,} coins\n'
+                              f'-bidder: {buyer}\n'
+                              f'ends in {time_until(int(auction["end"]) // 1000))}```'
+                    )
+                else:
+                    embed.add_field(
+                        name=f'{item["quantity"]}x {item["name"].upper()}',
+                        value=f'```diff\n! {int(auction["startingBid"]):,} coins\n'
+                              f'-❌ this auction has no bids!'
+                              f'ends in {time_until(int(auction["end"]) // 1000))}```'
+                    )
+        else:
+            embed.add_field(name=None, value='```❌ no auctions found```')
+            
+        await embed.send()
 
     async def royalty(self, message, *args):
         global db
@@ -1207,7 +1268,7 @@ class Bot(discord.Client):
             return
 
         await channel.send(str(best_route))
-
+        
     async def calculate_damage(self, message, *args):
         channel = message.channel
         user = message.author
