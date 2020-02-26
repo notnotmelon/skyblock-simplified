@@ -1163,7 +1163,7 @@ class Bot(discord.Client):
                 embed.add_field(name=Route.rarity_grammar(name).capitalize(), value=amount)
 
         if not await self.yesno(await embed.send(), user):
-            channel.send(f'{user.mention} session ended')
+            await channel.send(f'{user.mention} session ended')
             return
 
         numbers = ['0️⃣', '1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣', '🔟']
@@ -1304,7 +1304,7 @@ class Bot(discord.Client):
 
         if not best_route:
             await Embed(
-                channel,
+                    channel,
                 title='There is no possible setup that will give you 100% crit chance',
                 description='Collect more talismans or raise your combat level before trying again'
             ).send()
@@ -1314,10 +1314,12 @@ class Bot(discord.Client):
             channel,
             title='Success!'
         )
-        for route in best_route:
+        for color, color_end, route in zip(['', 'bash\n"', 'ini\n[', 'css\n[', 'fix\n'], ['', '"', ']', ']', ''], best_route):
+            route = route or r'```¯\_(ツ)_/¯```'
+            
             embed.add_field(
                 name=f'**{route.rarity_str.title()}**',
-                value=f'```{route or "❌"}```',
+                value=f'```{color}{route}{color_end}```',
                 inline=False
             )
         
@@ -1331,7 +1333,7 @@ class Bot(discord.Client):
                     else:
                         result += value * weapon.enchantments[enchantment]
             return result
-                    
+        
         base_mod = stats['enchantment modifier'] + player.skills['combat'] * 4
         zealot_mod = emod('zealots') + base_mod
         slayer_mod = emod('slayer bosses') + base_mod
@@ -1359,8 +1361,8 @@ class Bot(discord.Client):
         
         embed.add_field(
             name='**After**',
-            value=f'```{best_str} strength\n{best_cd} crit damage\n{best_cc} crit chance```'
-                  f'```{round(zealot_damage):,} to zealots\n{round(slayer_damage):,} to slayer bosses```'
+            value=f'```{best_str} strength\n{best_cd} crit damage\n{best_cc} crit chance"```'
+                  f'```{round(zealot_damage):,} to zealots\n{round(slayer_damage):,} to slayer bosses"```'
         )
             
         await embed.send()
