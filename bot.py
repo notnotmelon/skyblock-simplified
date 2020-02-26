@@ -636,9 +636,7 @@ class Bot(discord.Client):
         )
 
         if r:
-            now = time.time()
-        
-            for auction in r:
+			for auction in r:
                 item = auction['itemData']
                 
                 if auction['bids']:
