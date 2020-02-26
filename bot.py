@@ -504,7 +504,7 @@ class Bot(discord.Client):
     async def log(self, *args):
         print(*args, sep='')
 
-    async def on_error(event, *args, **kwargs):
+    async def on_error(self, *args, **kwargs):
         error = traceback.format_exc()
         await self.get_user(270352691924959243).send(error)
         print(error)
@@ -746,7 +746,8 @@ class Bot(discord.Client):
         r = await craftlink(user, channel, query, operation='Item', name=itemname)
         if r is None:
             return
-        sales = r['item']['sales']
+        r = r['item']
+        sales = r['sales']
 
         if stacksize is None:
             stacksize = 64 if max([int(auction['itemData']['quantity']) for auction in r['recent']]) > 32 else 1
