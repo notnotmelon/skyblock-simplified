@@ -26,7 +26,7 @@ keys = os.getenv('API_KEY').split()
 
 def time_until(goal):
 	now = datetime.now(timezone.utc)
-	then = datetime.fromtimestamp(goal)
+	then = datetime.fromtimestamp(goal, timezone.utc)
 	delta = then - now
 	
 	d, h, m, s = delta.days, delta // timedelta(hours=1), delta // timedelta(minutes=1), delta.seconds
