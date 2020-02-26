@@ -14,6 +14,7 @@ from datetime import datetime, timezone, timedelta
 from bs4 import BeautifulSoup
 import cloudscraper
 from aiohttp import ClientError
+import traceback
 
 TIME_FORMAT = '%m/%d %I:%M %p UTC'
 
@@ -373,11 +374,6 @@ def chunks(lst, n):
         for i in range(0, len(lst), n):
             yield lst[i:i + n]
 
-
-# async def on_error(event, *args, **kwargs):
-#     traceback.print_exc()
-#
-
 class Bot(discord.Client):
     def __init__(self, *args, **kwargs):
         self.callables = {}
@@ -507,6 +503,11 @@ class Bot(discord.Client):
 
     async def log(self, *args):
         print(*args, sep='')
+
+    async def on_error(event, *args, **kwargs):
+        error = traceback.format_exc()
+        await self.get_user(270352691924959243).send(error)
+        print(error)
 
     async def on_ready(self):
         await self.log(f'Logged on as {self.user}!')
@@ -745,8 +746,7 @@ class Bot(discord.Client):
         r = await craftlink(user, channel, query, operation='Item', name=itemname)
         if r is None:
             return
-        r = ['item']
-        sales = r['sales']
+        sales = r['item']['sales']
 
         if stacksize is None:
             stacksize = 64 if max([int(auction['itemData']['quantity']) for auction in r['recent']]) > 32 else 1
@@ -1314,7 +1314,7 @@ class Bot(discord.Client):
             channel,
             title='Success!'
         )
-        for color, color_end, route in zip(['', 'bash\n"', 'ini\n[', 'css\n[', 'fix\n'], ['', '"', ']', ']', ''], best_route):
+        for color, color_end, route in zip(['[', 'bash\n"', 'ini\n[', 'css\n[', 'fix\n['], [']', '"', ']', ']', ']'], best_route):
             route = route or r'```¯\_(ツ)_/¯```'
             
             embed.add_field(
@@ -1361,8 +1361,8 @@ class Bot(discord.Client):
         
         embed.add_field(
             name='**After**',
-            value=f'```{best_str} strength\n{best_cd} crit damage\n{best_cc} crit chance"```'
-                  f'```{round(zealot_damage):,} to zealots\n{round(slayer_damage):,} to slayer bosses"```'
+            value=f'```{best_str} strength\n{best_cd} crit damage\n{best_cc} crit chance```'
+                  f'```{round(zealot_damage):,} to zealots\n{round(slayer_damage):,} to slayer bosses```'
         )
             
         await embed.send()
@@ -1378,7 +1378,7 @@ class Bot(discord.Client):
             'weapon damage': f'{user.mention} how much **damage** does your weapon have on the tooltip?',
             'combat level': f'{user.mention} what is your **combat level**?'
         }
-
+        
         for stat in stats.keys():
             await channel.send(questions[stat])
             resp = await self.respond(user, channel)
