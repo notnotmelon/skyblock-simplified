@@ -200,7 +200,7 @@ class Item:
 				
 		if name == 'RECLUSE_FANG':
 			add('strength', 370)
-		elif name == 'SHREDDER':
+		elif name == 'THE_SHREDDER':
 			add('damage', 115)
 			add('strength', 15)
 		elif name == 'NIGHT_CRYSTAL' or name == 'DAY_CRYSTAL':

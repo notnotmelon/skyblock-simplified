@@ -1332,11 +1332,11 @@ class Bot(discord.Client):
                         result += value * weapon.enchantments[enchantment]
             return result
                     
-        base_mod = stats['enchantment modifier']
+        base_mod = stats['enchantment modifier'] + player.skills['combat'] * 4
         zealot_mod = emod('zealots') + base_mod
         slayer_mod = emod('slayer bosses') + base_mod
         
-        if weapon.internal_name == 'REAPER_FALCHION':
+        if weapon.internal_name == 'REAPER_SWORD':
             slayer_mult = 3
         elif weapon.internal_name == 'SCORPION_FOIL':
             slayer_mult = 2.5
