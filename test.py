@@ -11,9 +11,9 @@ if os.environ.get('API_KEY') is None:
 keys = os.getenv('API_KEY').split()
 
 async def main():
-	player = await skypy.Player(keys, uname='oddipoddi')
+	player = await skypy.Player(keys, uname='craftedfury')
 	await player.set_profile(list(player.profiles.values())[0])
-	for item in player.armor:
+	for item in player.talisman_bag:
 		pprint(item.__nbt__)
 		print(item.stats())
 		print(item.stats(use_reforge=False))
