@@ -105,7 +105,7 @@ talismen = {
     'BAIT_RING': 'Bait Ring',
     'SEAL_OF_THE_FAMILY': 'Seal of the Family',
     'HUNTER_RING': 'Hunter Ring',
-    'CAMPFIRE_TALISMAN_30': 'Campfire God Badge 30',
+    'CAMPFIRE_TALISMAN_29': 'Campfire God Badge 30',
 	'ETERNAL_CRYSTAL': 'Eternal Crystal'
 }
 
