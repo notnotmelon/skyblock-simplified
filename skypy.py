@@ -230,22 +230,16 @@ class Item:
 def damage(weapon_dmg, strength, crit_dmg, ench_modifier):
 	return (5 + weapon_dmg + strength // 5) * (1 + strength / 100) * (1 + crit_dmg / 100) * (1 + ench_modifier / 100)
 
-async def get_uuid(uname):
-	r = await (await session()).get(f'https://api.mojang.com/users/profiles/minecraft/{uname}')
+async def fetch_uuid_uname(uname_or_uuid):
 	try:
-		return (await r.json(content_type=None))['id']
-	except TypeError:
-		raise BadNameError('Invalid uname!') from None
-	finally:
-		r.close()
-
-
-async def get_uname(uuid):
-	r = await (await session()).get(f'https://api.mojang.com/user/profiles/{uuid}/names')
-	try:
-		return (await r.json(content_type=None))[-1]['name']
-	except TypeError:
-		raise BadNameError('Invalid uuid!') from None
+        r = await (await session()).get(f'https://mc-heads.net/minecraft/profile/{uname_or_uuid}')
+        json = await r.json(content_type=None)
+		return (json['name'], json['id'])
+	except aiohttp.ClientResponseError as e:
+        if e.status == 204:
+            raise BadNameError('Invalid uname!') from None
+        else:
+            raise e from None
 	finally:
 		r.close()
 
@@ -435,17 +429,12 @@ class Player(ApiInterface):
 	Use weapons() and set_weapon() to retrieve and set the player's weapon."""
 
 	async def __init__(self, *, uname=None, uuid=None, guild=False):
-		if uname and uuid:
-			self.uname = uname
-			self.uuid = uuid
-		elif uname:
-			self.uname = uname
-			self.uuid = await get_uuid(uname)
-		elif uuid:
-			self.uuid = uuid
-			self.uname = await get_uname(uuid)
-		else:
+		if not uuid and not uname:
 			raise SkyblockError('You need to provide either a minecraft username or uuid!')
+        elif not uuid:
+            self.uname, self.uuid = await fetch_uuid_uname(uname)
+		else:
+			self.uname, self.uuid = await fetch_uuid_uname(uuid)
 
 		try:
 			self.profiles = {}
@@ -479,13 +468,11 @@ class Player(ApiInterface):
 	def __repr__(self):
 		return self.uname
 
-	def skin(self, render='avatar'):
-		try:
-			render = {'avatar': 'avatars', 'head': 'head', 'body': 'body'}[render]
-		except KeyError:
-			raise SkyblockError('Invalid render! Choose from avatar, head, or body') from None
-			
-		return f'https://crafatar.com/{render}/{self.uuid}?overlay'
+	def avatar(self, size=None):
+        if size:
+            return f'https://mc-heads.net/minecraft/profile/{self.uuid}/{size}'
+        else:
+            return f'https://mc-heads.net/minecraft/profile/{self.uuid}'
 
 	async def set_profile_automatically(self, attribute=lambda player: player.total_slayer_exp):
 		"""Sets a player profile automatically
