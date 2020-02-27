@@ -897,7 +897,6 @@ class Bot(discord.Client):
             return embed, last_page
 
         await self.book(user, channel, pages)
-        await self.book(user, channel, pages)
 
     async def player(self, message, *args):
         user = message.author
@@ -1661,7 +1660,11 @@ class Bot(discord.Client):
         both = {'⬅️': -1, '➡️': 1}
 
         if user.dm_channel != channel and channel.guild.me.permissions_in(channel).manage_messages:
-            embed, last_page = await pages(page_num)
+            r = await pages(page_num)
+            if r is None:
+                return
+            embed, last_page = r
+            
             msg = await embed.send()
             while True:
                 if page_num == 0 and last_page is True:
@@ -1676,11 +1679,20 @@ class Bot(discord.Client):
                 if result is None:
                     break
                 page_num += result
-                embed, last_page = await pages(page_num)
+                
+                r = await pages(page_num)
+                if r is None:
+                    return
+                embed, last_page = r
+                
                 await msg.edit(embed=embed)
         else:
             while True:
-                embed, last_page = await pages(page_num)
+                r = await pages(page_num)
+                if r is None:
+                    return
+                embed, last_page = r
+            
                 msg = await embed.send()
                 if page_num == 0 and last_page is True:
                     return
