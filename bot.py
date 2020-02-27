@@ -515,7 +515,7 @@ class Bot(discord.Client):
 
     async def on_error(self, *args, **kwargs):
         error = traceback.format_exc()
-        await self.get_user(270352691924959243).send(error)
+        await self.get_user(270352691924959243).send(f'```{error}```')
         print(error)
 
     async def on_ready(self):
@@ -1110,7 +1110,7 @@ class Bot(discord.Client):
                     await channel.send(f'Invalid profile! Did you make a typo?{CLOSE_MESSAGE}')
 
         if player.enabled_api['skills'] is False or player.enabled_api['inventory'] is False:
-            await self.api_disabled(user.name, 'API', '', channel)
+            await self.api_disabled(user.name, '', 'API', channel)
             return
         
         if len(player.weapons) == 0:
@@ -1489,7 +1489,7 @@ class Bot(discord.Client):
                 return
 
         if player.enabled_api['inventory'] is False:
-            await self.api_disabled(player.uname, 'inventory API', f' on {player.profile_name.title()}', channel)
+            await self.api_disabled(player.uname, f' on {player.profile_name.title()}', 'inventory API', channel)
             return
 
         talismans = skypy_constants.talismen.copy()
