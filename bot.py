@@ -323,6 +323,15 @@ class Embed(discord.Embed):
     async def send(self):
         return await self.channel.send(embed=self)
 
+GRAY = ('brainfuck', '')
+PUKE = ('css', '')
+GREEN = ('yaml', '')
+BLUE = ('md', '#')
+YELLOW = ('fix', '')
+ORANGE = ('glsl', '#')
+RED = ('diff', '-')
+def colorize(s, color):
+    return f'```{color[0]}\n' + s.replace('\n', f'\n{color[1]}') + '\n```'
 
 class Route:
     def __init__(self, talismans, rarity):
@@ -1313,12 +1322,12 @@ class Bot(discord.Client):
             channel,
             title='Success!'
         )
-        for color, color_end, route in zip(['python\n#[', 'css\n', 'ini\n[', 'css\n[', 'fix\n['], [']', '', ']', ']', ']'], best_route):
+        for route, color in zip(best_route, [GRAY, GREEN, BLUE, RED, YELLOW]):
             route = route if route.counts else r'```¯\_(ツ)_/¯```'
             
             embed.add_field(
                 name=f'**{route.rarity_str.title()}**',
-                value=f'```{color}{route}{color_end}```',
+                value=colorize(route, color),
                 inline=False
             )
         
