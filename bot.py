@@ -1008,7 +1008,7 @@ class Bot(discord.Client):
             for pepper, players in meal.items():
                 lb.add_field(
                     name=pepper,
-                    value=('```css\n' + "\n".join(players) + '```') if players else r'```¯\_(ツ)_/¯```',
+                    value=('```css\n' + "\n".join(players)[:1000] + '```') if players else r'```¯\_(ツ)_/¯```',
                     inline=False
                 )
 
@@ -1314,7 +1314,7 @@ class Bot(discord.Client):
             title='Success!'
         )
         for color, color_end, route in zip(['python\n#[', 'css\n', 'ini\n[', 'css\n[', 'fix\n['], [']', '', ']', ']', ']'], best_route):
-            route = route.counts or r'```¯\_(ツ)_/¯```'
+            route = route if route.counts else r'```¯\_(ツ)_/¯```'
             
             embed.add_field(
                 name=f'**{route.rarity_str.title()}**',
