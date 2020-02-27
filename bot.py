@@ -331,7 +331,7 @@ YELLOW = ('fix', '')
 ORANGE = ('glsl', '#')
 RED = ('diff', '-')
 def colorize(s, color):
-    return f'```{color[0]}\n' + s.replace('\n', f'\n{color[1]}') + '\n```'
+    return f'```{color[0]}\n' + str(s).replace('\n', f'\n{color[1]}') + '\n```'
 
 class Route:
     def __init__(self, talismans, rarity):
@@ -649,7 +649,7 @@ class Bot(discord.Client):
                 item = auction['itemData']
                 
                 if auction['bids']:
-                    buyer = await skypy.get_uname(auction['bids'][0]['bidder'])
+                    _, buyer = await skypy.fetch_uuid_uname(auction['bids'][0]['bidder'])
 
                     embed.add_field(
                         name=f'{item["quantity"]}x {item["name"].upper()}',
@@ -806,7 +806,7 @@ class Bot(discord.Client):
 
         name = args[0]
         try:
-            uuid = await skypy.get_uuid(name)
+            _, uuid = await skypy.fetch_uuid_uname(name)
         except skypy.BadNameError:
             await channel.send(f'{user.mention} invalid username!')
             return
@@ -831,7 +831,7 @@ class Bot(discord.Client):
 
             if r:
                 for auction in r:
-                    buyer = await skypy.get_uname(auction['bids'][0]['bidder'])
+                    buyer, _ = await skypy.fetch_uuid_uname(auction['bids'][0]['bidder'])
 
                     item = auction['itemData']
                     embed.add_field(
@@ -859,7 +859,7 @@ class Bot(discord.Client):
 
         name = args[0]
         try:
-            uuid = await skypy.get_uuid(name)
+            _, uuid = await skypy.fetch_uuid_uname(name)
         except skypy.BadNameError:
             await channel.send(f'{user.mention} invalid username!')
             return
@@ -888,7 +888,7 @@ class Bot(discord.Client):
                     embed.add_field(
                         name=f'{item["quantity"]}x {item["name"].upper()}',
                         value=f'```diff\n! {int(auction["highestBidAmount"]):,} coins\n'
-                              f'-by {await skypy.fetch_uuid_uname(auction["seller"])}\n'
+                              f'-by {(await skypy.fetch_uuid_uname(auction["seller"]))[0]}\n'
                               f'{datetime.fromtimestamp(int(auction["end"]) // 1000).strftime(TIME_FORMAT)}```'
                     )
             else:
@@ -1489,7 +1489,7 @@ class Bot(discord.Client):
                 return
 
         if player.enabled_api['inventory'] is False:
-            await self.api_disabled(player.uname, 'inventory API', f' on {self.profile_name.title()}', channel)
+            await self.api_disabled(player.uname, 'inventory API', f' on {player.profile_name.title()}', channel)
             return
 
         talismans = skypy_constants.talismen.copy()
