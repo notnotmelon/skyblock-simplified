@@ -231,17 +231,12 @@ def damage(weapon_dmg, strength, crit_dmg, ench_modifier):
     return (5 + weapon_dmg + strength // 5) * (1 + strength / 100) * (1 + crit_dmg / 100) * (1 + ench_modifier / 100)
 
 async def fetch_uuid_uname(uname_or_uuid):
-    try:
-        r = await (await session()).get(f'https://mc-heads.net/minecraft/profile/{uname_or_uuid}')
+    s = await session()
+    async with s.get(f'https://mc-heads.net/minecraft/profile/{uname_or_uuid}') as r:
         json = await r.json(content_type=None)
+        if json is None:
+            raise BadNameError('Malformed uname or username') from None
         return (json['name'], json['id'])
-    except aiohttp.ClientResponseError as e:
-        if e.status == 204:
-            raise BadNameError('Invalid uname!') from None
-        else:
-            raise e from None
-    finally:
-        r.close()
 
 class ApiInterface:
     def __next_key__(self):
@@ -470,9 +465,9 @@ class Player(ApiInterface):
 
     def avatar(self, size=None):
         if size:
-            return f'https://mc-heads.net/minecraft/profile/{self.uuid}/{size}'
+            return f'https://mc-heads.net/avatar/{self.uuid}/{size}'
         else:
-            return f'https://mc-heads.net/minecraft/profile/{self.uuid}'
+            return f'https://mc-heads.net/avatar/{self.uuid}'
 
     async def set_profile_automatically(self, attribute=lambda player: player.total_slayer_exp):
         """Sets a player profile automatically
