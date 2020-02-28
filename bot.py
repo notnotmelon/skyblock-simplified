@@ -514,8 +514,8 @@ class Bot(discord.Client):
         print(*args, sep='')
 
     async def on_error(self, *args, **kwargs):
-        error = traceback.format_exc()
-        await self.get_user(270352691924959243).send(f'```{error.replace("```", "\"\"\"")}```')
+        error = traceback.format_exc().replace('```', '"""')
+        await self.get_user(270352691924959243).send(f'```python\n{error}```')
         print(error)
 
     async def on_ready(self):
