@@ -759,7 +759,7 @@ class Bot(discord.Client):
         if stacksize is None:
             if r['recent']:
                 stacksize = 64 if max([int(auction['itemData']['quantity']) for auction in r['recent']]) > 32 else 1
-            else
+            else:
                 stacksize = 1
 
         auctions = [float(item['price']) * stacksize for item in sales]
