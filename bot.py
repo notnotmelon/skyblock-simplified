@@ -331,7 +331,7 @@ YELLOW = ('fix', '')
 ORANGE = ('glsl', '#')
 RED = ('diff', '-')
 def colorize(s, color):
-    return f'```{color[0]}\n' + str(s).replace('\n', f'\n{color[1]}') + '\n```'
+    return f'```{color[0]}\n' + f'\n{color[1]}'.join(str(s).split('\n')) + '\n```'
 
 class Route:
     def __init__(self, talismans, rarity):
@@ -515,7 +515,7 @@ class Bot(discord.Client):
 
     async def on_error(self, *args, **kwargs):
         error = traceback.format_exc()
-        await self.get_user(270352691924959243).send(f'```{error.replace("```", "'''")}```')
+        await self.get_user(270352691924959243).send(f'```{error.replace("```", "\"\"\"")}```')
         print(error)
 
     async def on_ready(self):
