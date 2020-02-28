@@ -331,8 +331,8 @@ YELLOW = ('fix', '')
 ORANGE = ('glsl', '#')
 RED = ('diff', '-')
 def colorize(s, color):
-    x= f'```{color[0]}\n' + f'\n{color[1]}'.join(str(s).split('\n')) + '\n```'
-    print(x);return x
+    language, point = color
+    return f'```{language}\n{point}' + str(s).replace('\n', f'\n{point}') + '\n```'
 
 class Route:
     def __init__(self, talismans, rarity):
@@ -346,7 +346,7 @@ class Route:
         self.rarity_str = ["common", "uncommon", "rare", "epic", "legendary"][self.rarity]
 
     def __str__(self):
-        return ', '.join(f'{c} '
+        return ' ߸ '.join(f'{c} '
                           f'{"godly/zealous" if self.rarity < 2 and name == "godly" else name} '
                           f'{Route.rarity_grammar(self.rarity_str, c)}'
                           for name, c in zip(RELEVANT_REFORGES.keys(), self.counts) if c != 0)
@@ -1498,7 +1498,7 @@ class Bot(discord.Client):
             channel,
             title=f'{user.name}, you should be doing **{damage} damage** with those stats'
         ).add_field(
-            name=f'>**{no_crit}** without a crit',
+            name=f'**{no_crit}** without a crit',
             value='```lua\n(5 + damage + floor(str ÷ 5)) ⋅\n(1 + str ÷ 100) ⋅\n(1 + cd ÷ 100) ⋅\n(1 + enchants ÷ 100)```'
         ).send()
 
