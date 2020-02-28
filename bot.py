@@ -515,7 +515,7 @@ class Bot(discord.Client):
 
     async def on_error(self, *args, **kwargs):
         error = traceback.format_exc()
-        await self.get_user(270352691924959243).send(f'```{error}```')
+        await self.get_user(270352691924959243).send(f'```{error.replace("```", "'''")}```')
         print(error)
 
     async def on_ready(self):
@@ -757,7 +757,10 @@ class Bot(discord.Client):
         sales = r['sales']
 
         if stacksize is None:
-            stacksize = 64 if max([int(auction['itemData']['quantity']) for auction in r['recent']]) > 32 else 1
+            if r['recent']:
+                stacksize = 64 if max([int(auction['itemData']['quantity']) for auction in r['recent']]) > 32 else 1
+            else
+                stacksize = 1
 
         auctions = [float(item['price']) * stacksize for item in sales]
 
@@ -1437,10 +1440,10 @@ class Bot(discord.Client):
         modifier = stats['combat level'] * 4
         for enchantment in ACTIVITIES[resp]:
             perk = ENCHANTMENT_VALUES[enchantment]
-            if isinstance(perk, int):
-                modifier += perk * enchant_levels[enchantment]
-            else:
+            if callable(perk):
                 modifier += perk(enchant_levels[enchantment])
+            else:
+                modifier += perk * enchant_levels[enchantment]                
 
         damage = round(skypy.damage(
             stats['weapon damage'],
