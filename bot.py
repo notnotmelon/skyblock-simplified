@@ -331,7 +331,8 @@ YELLOW = ('fix', '')
 ORANGE = ('glsl', '#')
 RED = ('diff', '-')
 def colorize(s, color):
-    return f'```{color[0]}\n' + f'\n{color[1]}'.join(str(s).split('\n')) + '\n```'
+    x= f'```{color[0]}\n' + f'\n{color[1]}'.join(str(s).split('\n')) + '\n```'
+    print(x);return x
 
 class Route:
     def __init__(self, talismans, rarity):
@@ -627,9 +628,12 @@ class Bot(discord.Client):
 
         name = args[0]
         try:
-            uuid = await skypy.fetch_uuid_uname(name)
+            _, uuid = await skypy.fetch_uuid_uname(name)
         except skypy.BadNameError:
             await channel.send(f'{user.mention} invalid username!')
+            return
+        except skypy.ExternalAPIError as e:
+            await channel.send(f'{user.mention} {e.reason}')
             return
         
         query = 'query Auctions($seller: String) { auctions(seller: $seller) { auction { id highestBidAmount startingBid itemName itemBytes bids { amount bidder timestamp } itemData { name lore id quantity tag } end }}}'
@@ -649,8 +653,11 @@ class Bot(discord.Client):
                 item = auction['itemData']
                 
                 if auction['bids']:
-                    _, buyer = await skypy.fetch_uuid_uname(auction['bids'][0]['bidder'])
-
+                    try:
+                        buyer, _ = await skypy.fetch_uuid_uname(auction['bids'][0]['bidder'])
+                    except skypy.ExternalAPIError as e:
+                        buyer = f'{user.mention} {e.reason}'
+                        
                     embed.add_field(
                         name=f'{item["quantity"]}x {item["name"].upper()}',
                         value=f'```diff\n! {int(auction["highestBidAmount"]):,} coins\n'
@@ -813,6 +820,9 @@ class Bot(discord.Client):
         except skypy.BadNameError:
             await channel.send(f'{user.mention} invalid username!')
             return
+        except skypy.ExternalAPIError as e:
+            await channel.send(f'{user.mention} {e.reason}')
+            return
 
         async def pages(page_num):
             query = 'query UserHistory($id: String, $type: String, $limit: Int, $skip: Int) { userHistory(id: $id, type: $type, limit: $limit, skip: $skip) { auctions { id seller itemData { texture id name tag quantity lore __typename } bids { bidder timestamp amount __typename } highestBidAmount end __typename } __typename } }'
@@ -834,7 +844,10 @@ class Bot(discord.Client):
 
             if r:
                 for auction in r:
-                    buyer, _ = await skypy.fetch_uuid_uname(auction['bids'][0]['bidder'])
+                    try:
+                        buyer, _ = await skypy.fetch_uuid_uname(auction['bids'][0]['bidder'])
+                    except skypy.ExternalAPIError:
+                        buyer = '[error fetching name]'
 
                     item = auction['itemData']
                     embed.add_field(
@@ -888,10 +901,16 @@ class Bot(discord.Client):
             if r:
                 for auction in r:
                     item = auction['itemData']
+                    
+                    try:
+                        seller, _ = await skypy.fetch_uuid_uname(auction['seller'])
+                    except skypy.ExternalAPIError:
+                        seller = '[error fetching name]'
+                    
                     embed.add_field(
                         name=f'{item["quantity"]}x {item["name"].upper()}',
                         value=f'```diff\n! {int(auction["highestBidAmount"]):,} coins\n'
-                              f'-by {(await skypy.fetch_uuid_uname(auction["seller"]))[0]}\n'
+                              f'-by {seller}\n'
                               f'{datetime.fromtimestamp(int(auction["end"]) // 1000).strftime(TIME_FORMAT)}```'
                     )
             else:
@@ -913,6 +932,9 @@ class Bot(discord.Client):
             player = await skypy.Player(keys, uname=args[0], guild=True)
         except (skypy.BadNameError, skypy.NeverPlayedSkyblockError, Exception):
             await channel.send(f'{user.mention} invalid username!')
+            return
+        except skypy.ExternalAPIError as e:
+            await channel.send(f'{user.mention} {e.reason}')
             return
 
         if len(args) == 1:
@@ -1070,7 +1092,16 @@ class Bot(discord.Client):
             try:
                 player = await skypy.Player(keys, uname=msg)
                 if len(player.profiles) == 0:
-                    await channel.send(f'You have no profiles? Please report this{CLOSE_MESSAGE}')
+                    await embed(
+                        channel,
+                        title=f'{user.name}, the Hypixel API has returned invalid information'
+                    ).add_field(
+                        name=None,
+                        value='You can usually solve this issue by simply retrying in a few minutes, contact melon if otherwise'
+                    ).set_footer(
+                        text='This error is rare, about the same chance as getting an overflux! Congratulations!'
+                    ).send()
+                    return
 
                 else:
                     valid = True
@@ -1080,6 +1111,10 @@ class Bot(discord.Client):
 
             except skypy.BadNameError:
                 await channel.send(f'Invalid username!{CLOSE_MESSAGE}')
+                
+            except skypy.ExternalAPIError as e:
+                await channel.send(f'{user.mention} {e.reason}')
+                return
 
         if len(player.profiles) == 1:
             await player.set_profile(list(player.profiles.values())[0])
@@ -1480,6 +1515,9 @@ class Bot(discord.Client):
         except (skypy.BadNameError, skypy.NeverPlayedSkyblockError):
             await channel.send(f'{user.mention} invalid username!')
             return
+        except skypy.ExternalAPIError as e:
+            await channel.send(f'{user.mention} {e.reason}')
+            return
 
         if len(args) == 1:
             await player.set_profile_automatically()
@@ -1765,7 +1803,7 @@ async def craftlink(user, channel, query, *, operation, **kwargs):
         async with (await skypy.session()).post(url, json=json) as r:
             return (await r.json(content_type=None))['data']
     except (asyncio.exceptions.TimeoutError, ClientError, ValueError):
-        await channel.send(f'{user.mention} a connection could not be established with {url}')
+        await channel.send(f'{user.mention} {url} did not respond after 30 seconds')
         return None
 
 client = motor.motor_asyncio.AsyncIOMotorClient(os.getenv('DATABASE_URI'))

@@ -30,7 +30,7 @@ class SkyblockError(Exception):
 class NeverPlayedSkyblockError(SkyblockError):
     """This user has never played skyblock before!"""
         
-class HypixelAPIError(SkyblockError):
+class ExternalAPIError(SkyblockError):
     """There was an issue connecting to the Hypixel API"""
     def __init__(self, reason): 
         self.reason = reason
@@ -232,11 +232,16 @@ def damage(weapon_dmg, strength, crit_dmg, ench_modifier):
 
 async def fetch_uuid_uname(uname_or_uuid):
     s = await session()
-    async with s.get(f'https://mc-heads.net/minecraft/profile/{uname_or_uuid}') as r:
-        json = await r.json(content_type=None)
-        if json is None:
-            raise BadNameError('Malformed uname or username') from None
-        return (json['name'], json['id'])
+    
+    try:
+        async with s.get(f'https://mc-heads.net/minecraft/profile/{uname_or_uuid}') as r:
+            json = await r.json(content_type=None)
+            if json is None:
+                raise BadNameError('Malformed uuid or username') from None
+            return (json['name'], json['id'])
+            
+    except asyncio.TimeoutError:
+        raise ExternalAPIError('Could not connect to https://mc-heads.net')
 
 class ApiInterface:
     def __next_key__(self):
@@ -267,7 +272,7 @@ class ApiInterface:
                     raise HypixelInternalError(f'Hypixel\'s servers could not complete your request')
                     
                 else:
-                    raise HypixelAPIError(data['cause'])
+                    raise ExternalAPIError(data['cause'])
         except asyncio.TimeoutError:
             return await self.__call_api__(api, **kwargs)
     
