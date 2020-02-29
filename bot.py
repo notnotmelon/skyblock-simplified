@@ -354,7 +354,8 @@ class Embed(discord.Embed):
 
     async def send(self):
         return await self.channel.send(embed=self)
-        
+
+WHITE = ('', '')   
 GRAY = ('brainfuck', '')
 GREY = GRAY
 PUKE = ('css', '')
@@ -1060,12 +1061,11 @@ class Bot(discord.Client):
         )
         
         for pet in sorted(player.pets, key=lambda pet: (pet.active, pet.level), reverse=True):
-            active = '\nActive' if pet.active else ''
-            value = f'Level > {pet.level}\nxp: {pet.xp:,.0f}{active}\n{pet.rarity.upper()}'
+            value = colorize(f'Level > {pet.level}\nxp: {pet.xp:,.0f}', YELLOW if pet.active else WHITE)
         
             embed.add_field(
                 name=f'{PET_EMOJIS[pet.internal_name]}\t{pet.name}',
-                value=colorize(value, RARITY_COLORS[pet.rarity])
+                value=value + colorize(pet.rarity.upper(), RARITY_COLORS[pet.rarity])
             )
             
         await embed.send()
