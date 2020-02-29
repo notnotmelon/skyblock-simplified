@@ -313,7 +313,7 @@ PET_EMOJIS = {
     'ENDER_DRAGON': '🐲',
     'GUARDIAN': '🛡️',
     'ENDERMAN': '🔚',
-    'BLUE WHALE': '🐳',
+    'BLUE_WHALE': '🐳',
     'GIRAFFE': '🦒',
     'PHOENIX': '🐦',
     'BEE': '🐝',
@@ -1059,12 +1059,12 @@ class Bot(discord.Client):
             url=player.avatar()
         )
         
-        for pet in sorted(player.pets, key=lambda pet: (pet.active, pet.level)):
+        for pet in sorted(player.pets, key=lambda pet: (pet.active, pet.level), reverse=True):
             active = '\nActive' if pet.active else ''
             value = f'Level > {pet.level}\nxp: {pet.xp:,.0f}{active}\n{pet.rarity.upper()}'
         
             embed.add_field(
-                name=f'{PET_EMOJIS[pet.internal_name]}\t**{pet.name}**',
+                name=f'{PET_EMOJIS[pet.internal_name]}\t{pet.name}',
                 value=colorize(value, RARITY_COLORS[pet.rarity])
             )
             
