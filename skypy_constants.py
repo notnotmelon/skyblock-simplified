@@ -138,7 +138,7 @@ pet_xp = [0, 100, 210, 330, 460, 605, 765,
             13645185, 14746885, 15938585, 17225285, 18611985, 20108685,
             21725385, 23472085, 25358785]
             
-pet_xp = {'common': pet_xp[0:100], 'uncommon': pet_xp[7:107], 'rare': pet_xp[12:112], 'epic': pet_xp[17:117], 'legendary': pet_xp[21:121]}
+pet_xp = {'common': pet_xp[0:100], 'uncommon': pet_xp[6:106], 'rare': pet_xp[11:111], 'epic': pet_xp[16:116], 'legendary': pet_xp[20:120]}
 
 '''
 pet_stats = {
