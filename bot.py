@@ -482,7 +482,7 @@ class Bot(discord.Client):
                     'pets': {
                         'args': '[username] (profile)',
                         'function': self.pets,
-                        'decs': 'Shows all of a player\'s pets and their pet levels'
+                        'desc': 'Shows all of a player\'s pets and their pet levels'
                     }
                 }
             },

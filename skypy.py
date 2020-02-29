@@ -249,7 +249,7 @@ class Pet:
         cls = Pet()
     
         cls.xp = data['exp']
-        cls.current = data['active']
+        cls.active = data['active']
         cls.rarity = data['tier'].lower()
         cls.internal_name = data['type']
         
