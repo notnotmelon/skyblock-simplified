@@ -157,6 +157,7 @@ EXPLOITERS = {
     '6170dede383a42a99db6166ca46a8469': ('combat',),
     '6c5b615c2c47428aad137249d37c6fcc': ('farming',),
     '44d03c6e2cba41799ad5c9d2f837d03d': ('farming',),
+    '55d1848407884c05a9b43fa3992e9865': ('farming',),
     '446dea472dd0494b89260421b9981d15': ('combat',)
 }
 
