@@ -296,6 +296,38 @@ reforges_list = list(RELEVANT_REFORGES.values())
 
 CLOSE_MESSAGE = '\n> _use **exit** to close the session_'
 
+PET_EMOJIS = {
+    'SKELETON_HORSE': '💀',
+    'SNOWMAN': '⛄',
+    'BAT': '🦇',
+    'SHEEP': '🐑',
+    'CHICKEN': '🐔',
+    'WITHER SKELETON': '🏴‍☠️',
+    'SILVERFISH': '🗿',
+    'RABBIT': '🐇',
+    'HORSE': '🐴',
+    'PIGMAN': '🐽',
+    'WOLF': '🐺',
+    'OCELOT': '🐱',
+    'LION': '🦁',
+    'ENDER_DRAGON': '🐲',
+    'GUARDIAN': '🛡️',
+    'ENDERMAN': '🔚',
+    'BLUE WHALE': '🐳',
+    'GIRAFFE': '🦒',
+    'PHOENIX': '🐦',
+    'BEE': '🐝',
+    'MAGMA_CUBE': '🌋',
+    'FLYING_FISH': '🐟',
+    'SQUID': '🦑',
+    'PARROT': '🦜',
+    'TIGER': '🐯',
+    'TURTLE': '🐢',
+    'SPIDER': '🕷',
+    'BLAZE': '🔥',
+    'JERRY': '🤡'
+}
+
 class Embed(discord.Embed):
     nbst = '\u200b'
 
@@ -323,6 +355,7 @@ class Embed(discord.Embed):
     async def send(self):
         return await self.channel.send(embed=self)
 
+RARITY_COLORS = {'common': GREY, 'uncommon': GREEN, 'rare': BLUE, 'epic': RED, 'legendary': YELLOW}
 GRAY = ('brainfuck', '')
 PUKE = ('css', '')
 GREEN = ('yaml', '')
@@ -332,7 +365,12 @@ ORANGE = ('glsl', '#')
 RED = ('diff', '-')
 def colorize(s, color):
     language, point = color
-    return f'```{language}\n{point}' + str(s).replace('\n', f'\n{point}') + '\n```'
+    s = str(s)
+    
+    if s:
+        return f'```{language}\n{point}' + s.replace('\n', f'\n{point}') + '\n```'
+    else:
+        return ''
 
 class Route:
     def __init__(self, talismans, rarity):
@@ -710,11 +748,11 @@ class Bot(discord.Client):
             i = 0
             if optional_function:
                 for d in await cursor.to_list(length=None):
-                    players.append(f'#{str(i + 1).ljust(2)} {d["name"]} [{round(d[current + "_"], 3)}] [{round(d[current], 3):,}]')
+                    players.append(f'#{str(i + 1).ljust(2)} {d["name"]} [{d[current + "_"]:.3f}] [{d[current]:,.3f}]')
                     i += 1
             else:
                 for d in await cursor.to_list(length=None):
-                    players.append(f'#{str(i + 1).ljust(2)} {d["name"]} [{round(d[current], 3):,}]')
+                    players.append(f'#{str(i + 1).ljust(2)} {d["name"]} [{d[current]:,.3f}]')
                     i += 1
 
             portion = len(players) / 30
@@ -806,7 +844,7 @@ class Bot(discord.Client):
             description='Powered by https://hypixel-skyblock.com'
         ).add_field(
             name=None,
-            value=f'```Average: {round(avg):,}\nMedian: {round(mid):,}\nMode: {round(common):,}\nStandard Deviation: {round(std):,}\nMin: {math.ceil(small):,}\nMax: {math.ceil(big):,}```'
+            value=f'```Average: {avg:,.0f}\nMedian: {mid:,.0f}\nMode: {common:,.0f}\nStandard Deviation: {std:,.0f}\nMin: {math.ceil(small):,}\nMax: {math.ceil(big):,}```'
                   f'```There were {len(steals)} steals and {size} total sales```'
         ).set_footer(
             text='Statistics are from the last 1500 items sold\nPrices are ignored unless they are within 1.5 standard deviations'
@@ -962,10 +1000,10 @@ class Bot(discord.Client):
             channel,
             title=f'{player.uname} | {player.profile_name}',
             description=f'```{api_header}```\n'
-                        f'```Skill Average > {round(player.skill_average, 2)}{"*" if player.uuid in EXPLOITERS else ""}\n'
+                        f'```Skill Average > {player.skill_average:.2f}{"*" if player.uuid in EXPLOITERS else ""}\n'
                         f'Deaths > {player.deaths}\n'
                         f'Guild > {player.guild}\n'
-                        f'Money > {round(player.bank_balance + player.purse):,}\n'
+                        f'Money > {player.bank_balance + player.purse:,.0f}\n'
                         f'Slots > {player.minion_slots} ({player.unique_minions} crafts)```'
         ).set_thumbnail(
             url=player.avatar()
@@ -1014,11 +1052,19 @@ class Bot(discord.Client):
 
         embed = Embed(
             channel,
-            title=f'{player.uname} | {player.profile_name}',
-            description=f'```{pets}```'
+            title=f'{player.uname} | {player.profile_name}'
         ).set_thumbnail(
             url=player.avatar()
         )
+        
+        for pet in sorted(player.pets, key=lambda pet: (pet.active, pet.level)):
+            active = '\nActive' if pet.active else ''
+            value = f'Level > {pet.level}\nxp: {pet.xp:,.0f}{active}\n{pet.rarity.upper()}'
+        
+            embed.add_field(
+                name=f'{PET_EMOJIS[pet.internal_name]}\t**{pet.name}**',
+                value=colorize(value, RARITY_COLORS[pet.rarity])
+            )
             
         await embed.send()
 
@@ -1043,18 +1089,18 @@ class Bot(discord.Client):
         embed = Embed(
             channel,
             title=f'{guild.gname} | {guild.tag}' if guild.tag else guild.gname,
-            description=f'```Skill Average > {round(guild.stat_average("skill_average"), 3)}\n'
+            description=f'```Skill Average > {guild.stat_average("skill_average"):.3f}\n'
                         f'Players > {len(guild)}\n'
                         f'Level > {guild.level}\n'
                         f'Deaths > {guild.deaths:,}\n'
-                        f'Average Money > {round((guild.bank_balance + guild.purse) / len(guild)):,}\n'
-                        f'Slots > {round(guild.stat_average("minion_slots"), 3)} ({round(guild.stat_average("unique_minions"))} crafts)```'
+                        f'Average Money > {(guild.bank_balance + guild.purse) / len(guild):,.0f}\n'
+                        f'Slots > {guild.stat_average("minion_slots"):.3f} ({guild.stat_average("unique_minions"):.0f} crafts)```'
         )
 
         for name, (emoji, _, _, function, optional_function) in LEVELS.items():
             embed.add_field(
                 name=f'{emoji}\t{name}',
-                value=f'```Level > {round(optional_function(guild), 3)}\nxp: {round(function(guild)):,}```'
+                value=f'```Level > {optional_function(guild):.3f}\nxp: {function(guild):,.0f}```'
             )
 
         menu = {}
@@ -1073,10 +1119,10 @@ class Bot(discord.Client):
             players.sort(key=lambda tuple: tuple[1], reverse=True)
 
             if optional_function:
-                players = [f'#{str(index + 1).ljust(2)} {player.uname} [{round(optional_stat, 2)}] [{round(stat, 2):,}]'
+                players = [f'#{str(index + 1).ljust(2)} {player.uname} [{optional_stat:.2f}] [{stat:,.2f}]'
                            for index, (player, stat, optional_stat) in enumerate(players)]
             else:
-                players = [f'#{str(index + 1).ljust(2)} {player.uname} [{round(stat, 2):,}]'
+                players = [f'#{str(index + 1).ljust(2)} {player.uname} [{stat:,.2f}]'
                            for index, (player, stat) in enumerate(players)]
 
             portion = len(players) / 30
@@ -1448,14 +1494,14 @@ class Bot(discord.Client):
         
         embed.add_field(
             name='**Before**',
-            value=f'```{cur_str} strength\n{cur_cd} crit damage\n{cur_cc} crit chance```'
-                  f'```{round(zealot_damage):,} to zealots\n{round(slayer_damage):,} to slayers```'
+            value=f'```{cur_str:.0f} strength\n{cur_cd:.0f} crit damage\n{cur_cc:.0f} crit chance```'
+                  f'```{zealot_damage:,.0f} to zealots\n{slayer_damage:,.0f} to slayers```'
         )
         
         embed.add_field(
             name='**After**',
-            value=f'```{best_str} strength\n{best_cd} crit damage\n{best_cc} crit chance```'
-                  f'```{round(zealot_damage_after):,} to zealots\n{round(slayer_damage_after):,} to slayers```'
+            value=f'```{best_str:.0f} strength\n{best_cd:.0f} crit damage\n{best_cc:.0f} crit chance```'
+                  f'```{zealot_damage_after:,.0f} to zealots\n{slayer_damage_after:,.0f} to slayers```'
         )
             
         if zealot_damage > zealot_damage_after or slayer_damage > slayer_damage_after:
@@ -1688,7 +1734,7 @@ class Bot(discord.Client):
             inline=False
         ).add_field(
             name='Heartbeat',
-            value=f'This message was delivered in {round(self.latency * 1000)} milliseconds',
+            value=f'This message was delivered in {self.latency * 1000:.0f} milliseconds',
             inline=False
         ).send()
 
