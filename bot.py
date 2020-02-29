@@ -1509,7 +1509,7 @@ class Bot(discord.Client):
             
         if zealot_damage > zealot_damage_after or slayer_damage > slayer_damage_after:
             embed.set_footer(
-                text='Even though you will be dealing less damage, you will gain a much higher crit chance'
+                text=f'Even though you will be dealing less damage, you will gain {best_cc - cur_cc} crit chance'
             )
             
         await embed.send()

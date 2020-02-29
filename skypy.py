@@ -248,17 +248,15 @@ class Pet:
     def from_API(data):
         cls = Pet()
     
-        cls.xp = data['exp']
-        cls.active = data['active']
-        cls.rarity = data['tier'].lower()
-        cls.internal_name = data['type']
+        cls.xp = data.get('exp', 0)
+        cls.active = data.get('active', False)
+        cls.rarity = data.get('tier', 'COMMON').lower()
+        cls.internal_name = data.get('type', 'BEE')
         
         for level, requirement in enumerate(pet_xp[cls.rarity]):
             if requirement > cls.xp:
                 break
-        else:
-            level += 1
-        cls.level = level + 1
+        cls.level = level
         
         cls.name = cls.internal_name.capitalize().replace("_", " ")
         cls.title = f'[Lvl {cls.level}] {cls.name}'
