@@ -302,7 +302,7 @@ PET_EMOJIS = {
     'BAT': '🦇',
     'SHEEP': '🐑',
     'CHICKEN': '🐔',
-    'WITHER SKELETON': '🏴‍☠️',
+    'WITHER_SKELETON': '🏴‍☠️',
     'SILVERFISH': '🗿',
     'RABBIT': '🐇',
     'HORSE': '🐴',
