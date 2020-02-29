@@ -354,15 +354,17 @@ class Embed(discord.Embed):
 
     async def send(self):
         return await self.channel.send(embed=self)
-
-RARITY_COLORS = {'common': GREY, 'uncommon': GREEN, 'rare': BLUE, 'epic': RED, 'legendary': YELLOW}
+        
 GRAY = ('brainfuck', '')
+GREY = GRAY
 PUKE = ('css', '')
 GREEN = ('yaml', '')
 BLUE = ('md', '#')
 YELLOW = ('fix', '')
 ORANGE = ('glsl', '#')
 RED = ('diff', '-')
+RARITY_COLORS = {'common': GREY, 'uncommon': GREEN, 'rare': BLUE, 'epic': RED, 'legendary': YELLOW}
+
 def colorize(s, color):
     language, point = color
     s = str(s)
