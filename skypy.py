@@ -253,7 +253,7 @@ class Pet:
         cls.rarity = data['tier'].lower()
         cls.internal_name = data['type']
         
-        for level, requirement in pet_xp[cls.rarity]:
+        for level, requirement in enumerate(pet_xp[cls.rarity]):
             if requirement > cls.xp:
                 break
         cls.level = level
