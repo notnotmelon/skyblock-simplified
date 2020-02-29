@@ -213,7 +213,7 @@ class Item:
             add('strength', 10)
             add('defense', 10)
         elif name in end_defence.keys():
-            if results['defense'] - self.hot_potatos * 2 <= end_defence[self.internal_name] * 2:
+            if results['defense'] - self.hot_potatos * 2 < end_defence[self.internal_name] * 2:
                 for k in results.keys():
                     results[k] *= 2
             else:
@@ -242,6 +242,31 @@ async def fetch_uuid_uname(uname_or_uuid):
             
     except asyncio.TimeoutError:
         raise ExternalAPIError('Could not connect to https://mc-heads.net')
+
+class Pet:
+    @staticmethod
+    def from_API(data):
+        cls = Pet()
+    
+        cls.xp = data['exp']
+        cls.current = data['active']
+        cls.rarity = data['tier'].lower()
+        cls.internal_name = data['type']
+        
+        for level, requirement in pet_xp[cls.rarity]:
+            if requirement > cls.xp:
+                break
+        cls.level = level
+        
+        cls.name = f'[Lvl {cls.level}] {cls.internal_name.lower().replace("_", " ")}'
+        
+        return cls
+        
+    def __str__(self):
+        return self.name
+        
+    def __repr__(self):
+        return self.name
 
 class ApiInterface:
     def __next_key__(self):
@@ -518,6 +543,15 @@ class Player(ApiInterface):
             self.bank_balance = float(self.__api_data__['banking'].get('balance', 0))
         else:
             self.bank_balance = 0
+        
+        self.pets = []
+        self.current_pet = None
+        if 'pets' in v:
+            for data in v['pets']:
+                pet = Pet.from_API(data)
+                self.pets.append(pet)
+                if pet.active:
+                    self.current_pet = pet
         
         def parse_collections(data):
             try:

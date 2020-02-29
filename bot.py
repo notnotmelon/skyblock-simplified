@@ -384,6 +384,30 @@ def chunks(lst, n):
         for i in range(0, len(lst), n):
             yield lst[i:i + n]
 
+'''
+'skill events': {
+                'emoji': '😎',
+                'desc': 'Useful for guilds. Records the amount of skill experience gained by each player in a week. Raise your averages!',
+                'commands': {
+                    'start event': {
+                        'security': 1,
+                        'function': self.start_event,
+                        'desc': 'Starts a skyblock event',
+                        'session': True
+                    },
+                    'view leaderboard': {
+                        'function': self.view_lb,
+                        'desc': 'Displays the leaderboard for the current event'
+                    },
+                    'end event': {
+                        'security': 1,
+                        'function': self.end_event,
+                        'desc': 'Ends the current event and displays the winners'
+                    }
+                }
+            },
+'''
+
 class Bot(discord.Client):
     def __init__(self, *args, **kwargs):
         self.callables = {}
@@ -437,27 +461,6 @@ class Bot(discord.Client):
                     }
                 }
             },
-            'skill events': {
-                'emoji': '😎',
-                'desc': 'Useful for guilds. Records the amount of skill experience gained by each player in a week. Raise your averages!',
-                'commands': {
-                    'start event': {
-                        'security': 1,
-                        'function': self.start_event,
-                        'desc': 'Starts a skyblock event',
-                        'session': True
-                    },
-                    'view leaderboard': {
-                        'function': self.view_lb,
-                        'desc': 'Displays the leaderboard for the current event'
-                    },
-                    'end event': {
-                        'security': 1,
-                        'function': self.end_event,
-                        'desc': 'Ends the current event and displays the winners'
-                    }
-                }
-            },
             'spy': {
                 'emoji': '🕵️‍♂️',
                 'desc': 'View stats and leaderboards for both guilds and players. Most functions work without API settings enabled',
@@ -475,6 +478,11 @@ class Bot(discord.Client):
                     'royalty': {
                         'function': self.royalty,
                         'desc': 'Shows the top 30 guilds and players for every skill and slayer'
+                    },
+                    'pets': {
+                        'args': '[username] (profile)',
+                        'function': self.pets,
+                        'decs': 'Shows all of a player\'s pets and their pet levels'
                     }
                 }
             },
@@ -971,6 +979,46 @@ class Bot(discord.Client):
 
         if player.uuid in EXPLOITERS:
             embed.add_field(name="Cheater", value=f'***Player has bug abused or excessively macroed skill(s)**', inline=True)
+            
+        await embed.send()
+        
+    async def pets(self, message, *args):
+        user = message.author
+        channel = message.channel
+
+        if not args:
+            await self.no_args('pets', user, channel)
+            return
+
+        try:
+            player = await skypy.Player(keys, uname=args[0], guild=True)
+        except (skypy.BadNameError, skypy.NeverPlayedSkyblockError, Exception):
+            await channel.send(f'{user.mention} invalid username!')
+            return
+        except skypy.ExternalAPIError as e:
+            await channel.send(f'{user.mention} {e.reason}')
+            return
+
+        if len(args) == 1:
+            await player.set_profile_automatically()
+        else:
+            try:
+                await player.set_profile(player.profiles[args[1].capitalize()])
+            except KeyError:
+                await channel.send(f'{user.mention} invalid profile!')
+                return
+                
+        await update_top_players(player)
+
+        pets = '\n'.join(player.pets)
+
+        embed = Embed(
+            channel,
+            title=f'{player.uname} | {player.profile_name}',
+            description=f'```{pets}```'
+        ).set_thumbnail(
+            url=player.avatar()
+        )
             
         await embed.send()
 
