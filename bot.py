@@ -1010,7 +1010,7 @@ class Bot(discord.Client):
                 
         await update_top_players(player)
 
-        pets = '\n'.join(player.pets)
+        pets = '\n'.join(p.name for p in player.pets)
 
         embed = Embed(
             channel,
