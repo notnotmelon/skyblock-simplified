@@ -1445,7 +1445,7 @@ class Bot(discord.Client):
 		)
 
 		optimizers = {emoji: index for index, (emoji, _) in enumerate(optimizers)}
-		opt_goal = await self.reaction_menu(await embed.send(), msg, optimizers)
+		opt_goal = await self.reaction_menu(await embed.send(), user, optimizers)
 		if opt_goal is None:
 			return
 
@@ -1487,10 +1487,11 @@ class Bot(discord.Client):
 
 		#print(*(f"({n} {v})" for n, v in locals().items()))
 
-		best, best_route, best_str, best_cc, best_cd = optimizer(
+		best, best_route, best_str, best_cc, best_cd = self.pool.run_in_executor(None,
+			optimizer,
 			opt_goal,
-			player, 
-			weapon_damage, 
+			player,
+			weapon_damage,
 			base_str, 
 			base_cc,
 			base_cd
