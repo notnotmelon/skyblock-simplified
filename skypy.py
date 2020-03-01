@@ -260,7 +260,7 @@ class Pet:
             level += 1
         cls.level = level
         
-        cls.name = cls.internal_name.title().replace("_", " ")
+        cls.name = pet_stats[cls.internal_name]['name']
         cls.title = f'[Lvl {cls.level}] {cls.name}'
         
         cls.xp_remaining = pet_xp[cls.rarity][-1] - cls.xp
@@ -550,13 +550,13 @@ class Player(ApiInterface):
             self.bank_balance = 0
         
         self.pets = []
-        self.current_pet = None
+        self.pet = None
         if 'pets' in v:
             for data in v['pets']:
                 pet = Pet.from_API(data)
                 self.pets.append(pet)
                 if pet.active:
-                    self.current_pet = pet
+                    self.pet = pet
         
         def parse_collections(data):
             try:

@@ -376,7 +376,7 @@ def colorize(s, color):
     else:
         return ''
 
-def optimizer(player, weapon_damage, base_str, base_cc, base_cd):
+def optimizer(opt_goal, player, weapon_damage, base_str, base_cc, base_cd):
     best = 0
     best_route = []
     best_str = 0
@@ -390,7 +390,23 @@ def optimizer(player, weapon_damage, base_str, base_cc, base_cd):
 
     counts = player.talisman_counts()
 
-    if cc_mod(base_cc) <= 100:
+    if opt_goal == 0 or cc_mod(base_cc) > 100:
+        for c, u, r, e, l in itertools.product(
+                *[Route.routes(counts[key], 4, rarity_num) for rarity_num, key in enumerate(counts.keys())]):
+            strength = str_mod(base_str + c.strength + u.strength + r.strength + e.strength + l.strength)
+            crit_damage = cd_mod(
+                base_cd + c.crit_damage + u.crit_damage + r.crit_damage + e.crit_damage + l.crit_damage, strength)
+
+            d = (5 + weapon_damage + strength // 5) * (1 + strength / 100) * (1 + crit_damage / 100)
+
+            if d > best:
+                best = d
+                best_route = [c, u, r, e, l]
+                best_str = strength
+                best_cc = cc_mod(
+                    base_cc + c.crit_chance + u.crit_chance + r.crit_chance + e.crit_chance + l.crit_chance)
+                best_cd = crit_damage
+    else:
         cc_mod = stat_modifiers.get('crit chance', None)
         if cc_mod:
             for c, u, r, e, l in itertools.product(
@@ -429,22 +445,6 @@ def optimizer(player, weapon_damage, base_str, base_cc, base_cd):
                         best_str = strength
                         best_cc = crit_chance
                         best_cd = crit_damage
-    else:
-        for c, u, r, e, l in itertools.product(
-                *[Route.routes(counts[key], 4, rarity_num) for rarity_num, key in enumerate(counts.keys())]):
-            strength = str_mod(base_str + c.strength + u.strength + r.strength + e.strength + l.strength)
-            crit_damage = cd_mod(
-                base_cd + c.crit_damage + u.crit_damage + r.crit_damage + e.crit_damage + l.crit_damage, strength)
-
-            d = (5 + weapon_damage + strength // 5) * (1 + strength / 100) * (1 + crit_damage / 100)
-
-            if d > best:
-                best = d
-                best_route = [c, u, r, e, l]
-                best_str = strength
-                best_cc = cc_mod(
-                    base_cc + c.crit_chance + u.crit_chance + r.crit_chance + e.crit_chance + l.crit_chance)
-                best_cd = crit_damage
                 
     return (best, best_route, best_str, best_cc, best_cd)
 
@@ -1080,7 +1080,8 @@ class Bot(discord.Client):
                         f'Deaths > {player.deaths}\n'
                         f'Guild > {player.guild}\n'
                         f'Money > {player.bank_balance + player.purse:,.0f}\n'
-                        f'Slots > {player.minion_slots} ({player.unique_minions} crafts)```'
+                        f'Slots > {player.minion_slots} ({player.unique_minions} crafts)```\n'
+                        f'Pet > {player.pet.title}'
         ).set_thumbnail(
             url=player.avatar()
         )
@@ -1154,7 +1155,7 @@ class Bot(discord.Client):
                 embed = Embed(channel).set_thumbnail(url=player.avatar())
         else:
             embed.add_field(name=None, value='```❌ no pets found```')
-            embed.send()
+            await embed.send()
 
     async def guild(self, message, *args):
         user = message.author
@@ -1329,7 +1330,7 @@ class Bot(discord.Client):
                     await channel.send(f'Invalid profile! Did you make a typo?{CLOSE_MESSAGE}')
 
         if player.enabled_api['skills'] is False or player.enabled_api['inventory'] is False:
-            await self.api_disabled(user.name, '', 'API', channel)
+            await self.api_disabled(f'{user.name}, you have your API disabled!', channel)
             return
         
         if len(player.weapons) == 0:
@@ -1426,6 +1427,24 @@ class Bot(discord.Client):
                 if yn is True:
                     for name, amount in buff.items():
                         stats[name] += amount
+        
+        optimizers = [
+            ('💯', 'perfect crit chance'),
+            ('⚔️', 'maximum damage')
+        ]
+        
+        embed = Embed(
+            channel,
+            title='You are almost done!'
+        ).add_field(
+            name='What would you like to optimize for?',
+            value='\n'.join(f'> {emoji}\n`{value}`' for emoji, value in optimizers)
+        )
+
+        optimizers = {emoji: index for index, (emoji, _) in enumerate(optimizers)}
+        opt_goal = await self.reaction_menu(await embed.send(), msg, optimizers)
+        if opt_goal is None:
+            return
 
         def apply_stats(additional, reverse=False):
             for key, value in additional.items():
@@ -1468,6 +1487,7 @@ class Bot(discord.Client):
         best, best_route, best_str, best_cc, best_cd = await self.loop.run_in_executor(
             None,
             optimizer,
+            opt_goal,
             player, 
             weapon_damage, 
             base_str, 
@@ -1662,7 +1682,7 @@ class Bot(discord.Client):
                 return
 
         if player.enabled_api['inventory'] is False:
-            await self.api_disabled(player.uname, f' on {player.profile_name.title()}', 'inventory API', channel)
+            await self.api_disabled(f'{player.uname}, your inventory API is disabled on {player.profile_name.title()}!', channel)
             return
 
         talismans = skypy_constants.talismen.copy()
@@ -1905,7 +1925,7 @@ class Bot(discord.Client):
 
         await embed.send()
 
-    async def api_disabled(self, text, text_end, kind, channel):
+    async def api_disabled(self, title, channel):
         await Embed(
             channel,
             title=f'{text}, your **{kind}** is disabled!{text_end}',
