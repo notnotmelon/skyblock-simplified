@@ -1080,8 +1080,8 @@ class Bot(discord.Client):
                         f'Deaths > {player.deaths}\n'
                         f'Guild > {player.guild}\n'
                         f'Money > {player.bank_balance + player.purse:,.0f}\n'
-                        f'Slots > {player.minion_slots} ({player.unique_minions} crafts)```\n'
-                        f'Pet > {player.pet.title}'
+                        f'Slots > {player.minion_slots} ({player.unique_minions} crafts)\n'
+                        f'Pet > {player.pet.title if player.pet else None}```'
         ).set_thumbnail(
             url=player.avatar()
         )
