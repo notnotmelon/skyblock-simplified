@@ -331,13 +331,15 @@ PET_EMOJIS = {
 class Embed(discord.Embed):
     nbst = '\u200b'
 
-    def __init__(self, channel, *, title, **kwargs):
+    def __init__(self, channel, *, title=None, description=None, **kwargs):
         self.channel = channel
 
-        if 'description' in kwargs:
-            kwargs['description'] = kwargs['description'] or self.nbst
-
-        super().__init__(title=title or self.nbst, color=self.color(channel), **kwargs)
+        super().__init__(
+            title=title or self.nbst,
+            description=description or self.nbst,
+            color=self.color(channel),
+            **kwargs
+        )
 
     @staticmethod
     def color(channel):
@@ -1062,8 +1064,11 @@ class Bot(discord.Client):
         
         for chunk in chunks(sorted(player.pets, key=lambda pet: (pet.active, pet.xp), reverse=True), 18):
             for pet in chunk:
+                progress = 100 * pet.xp / (pet.xp + pet.xp_remaining)
+                progress = f'\n{progress:.2f}% to 100' if progress < 100 else ''
+                
                 value = colorize(
-                    f'Level > {pet.level}\nxp: {pet.xp:,.0f}\n{min(100, pet.xp // (pet.xp + pet.xp_remaining))}% to 100',
+                    f'Level > {pet.level}\nxp: {pet.xp:,.0f}{progress}',
                     YELLOW if pet.active else WHITE
                 )
             
