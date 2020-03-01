@@ -390,7 +390,7 @@ def optimizer(opt_goal, player, weapon_damage, base_str, base_cc, base_cd):
 
 	counts = player.talisman_counts()
 
-	if opt_goal == 0 or cc_mod(base_cc) > 100:
+	if opt_goal == 1 or cc_mod(base_cc) > 100:
 		for c, u, r, e, l in itertools.product(
 				*[Route.routes(counts[key], 4, rarity_num) for rarity_num, key in enumerate(counts.keys())]):
 			strength = str_mod(base_str + c.strength + u.strength + r.strength + e.strength + l.strength)
