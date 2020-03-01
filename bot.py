@@ -1487,7 +1487,7 @@ class Bot(discord.Client):
 
 		#print(*(f"({n} {v})" for n, v in locals().items()))
 
-		best, best_route, best_str, best_cc, best_cd = self.loop.run_in_executor(None,
+		best, best_route, best_str, best_cc, best_cd = await self.loop.run_in_executor(None,
 			optimizer,
 			opt_goal,
 			player,
