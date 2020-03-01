@@ -364,7 +364,7 @@ BLUE = ('md', '#')
 YELLOW = ('fix', '')
 ORANGE = ('glsl', '#')
 RED = ('diff', '-')
-RARITY_COLORS = {'common': GREY, 'uncommon': GREEN, 'rare': BLUE, 'epic': RED, 'legendary': YELLOW}
+RARITY_COLORS = {'common': GREY, 'uncommon': GREEN, 'rare': BLUE, 'epic': ORANGE, 'legendary': YELLOW}
 
 def colorize(s, color):
     language, point = color
@@ -420,10 +420,10 @@ class Route:
 
 
 def chunks(lst, n):
-        lst = list(lst)
-        """Yield successive n-sized chunks from lst."""
-        for i in range(0, len(lst), n):
-            yield lst[i:i + n]
+    """Yield successive n-sized chunks from lst."""
+    lst = list(lst)
+    for i in range(0, len(lst), n):
+        yield lst[i:i + n]
 
 '''
 'skill events': {
@@ -1059,17 +1059,22 @@ class Bot(discord.Client):
         ).set_thumbnail(
             url=player.avatar()
         )
-            
-        for pet in sorted(player.pets, key=lambda pet: (pet.active, pet.xp), reverse=True):
-            value = colorize(f'Level > {pet.level}\nxp: {pet.xp:,.0f}', YELLOW if pet.active else WHITE)
         
-            pin = '\t📌' if pet.active else ''
-            embed.add_field(
-                name=f'{PET_EMOJIS[pet.internal_name]}\t{pet.name}{pin}',
-                value=value + colorize(pet.rarity.upper(), RARITY_COLORS[pet.rarity])
-            )
+        for chunk in chunks(sorted(player.pets, key=lambda pet: (pet.active, pet.xp), reverse=True), 18):
+            for pet in chunk:
+                value = colorize(
+                    f'Level > {pet.level}\nxp: {pet.xp:,.0f}\n{min(100, pet.xp // (pet.xp + pet.xp_remaining))}% to 100',
+                    YELLOW if pet.active else WHITE
+                )
             
-        await embed.send()
+                pin = '\t📌' if pet.active else ''
+                embed.add_field(
+                    name=f'{PET_EMOJIS[pet.internal_name]}\t{pet.name}{pin}',
+                    value=value + colorize(pet.rarity.upper(), RARITY_COLORS[pet.rarity])
+                )
+            
+            await embed.send()
+            embed = Embed(channel)
 
     async def guild(self, message, *args):
         user = message.author

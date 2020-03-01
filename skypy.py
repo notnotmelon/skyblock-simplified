@@ -261,6 +261,8 @@ class Pet:
         cls.name = cls.internal_name.capitalize().replace("_", " ")
         cls.title = f'[Lvl {cls.level}] {cls.name}'
         
+        cls.xp_remaining = pet_xp[cls.rarity][-1] - cls.xp
+        
         return cls
         
     def __str__(self):
