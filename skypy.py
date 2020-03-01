@@ -256,9 +256,11 @@ class Pet:
         for level, requirement in enumerate(pet_xp[cls.rarity]):
             if requirement > cls.xp:
                 break
+        else:
+            level += 1
         cls.level = level
         
-        cls.name = cls.internal_name.capitalize().replace("_", " ")
+        cls.name = cls.internal_name.title().replace("_", " ")
         cls.title = f'[Lvl {cls.level}] {cls.name}'
         
         cls.xp_remaining = pet_xp[cls.rarity][-1] - cls.xp

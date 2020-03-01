@@ -323,7 +323,7 @@ PET_EMOJIS = {
     'PARROT': '🦜',
     'TIGER': '🐯',
     'TURTLE': '🐢',
-    'SPIDER': '🕷',
+    'SPIDER': '🕸️',
     'BLAZE': '🔥',
     'JERRY': '🤡'
 }
@@ -331,12 +331,10 @@ PET_EMOJIS = {
 class Embed(discord.Embed):
     nbst = '\u200b'
 
-    def __init__(self, channel, *, title=None, description=None, **kwargs):
+    def __init__(self, channel, *, **kwargs):
         self.channel = channel
 
         super().__init__(
-            title=title or self.nbst,
-            description=description or self.nbst,
             color=self.color(channel),
             **kwargs
         )
@@ -1062,24 +1060,27 @@ class Bot(discord.Client):
             url=player.avatar()
         )
         
-        for chunk in chunks(sorted(player.pets, key=lambda pet: (pet.active, pet.xp), reverse=True), 18):
-            for pet in chunk:
-                progress = 100 * pet.xp / (pet.xp + pet.xp_remaining)
-                progress = f'\n{progress:.2f}% to 100' if progress < 100 else ''
+        if player.pets:
+            for chunk in chunks(sorted(player.pets, key=lambda pet: (pet.active, pet.xp), reverse=True), 18):
+                for pet in chunk:
+                    progress = 100 * pet.xp / (pet.xp + pet.xp_remaining)
+                    progress = f'\n{progress:.2f}% to 100' if progress < 100 else ''
+                    
+                    value = colorize(
+                        f'Level > {pet.level}\nxp: {pet.xp:,.0f}{progress}',
+                        YELLOW if pet.active else WHITE
+                    )
                 
-                value = colorize(
-                    f'Level > {pet.level}\nxp: {pet.xp:,.0f}{progress}',
-                    YELLOW if pet.active else WHITE
-                )
-            
-                pin = '\t📌' if pet.active else ''
-                embed.add_field(
-                    name=f'{PET_EMOJIS[pet.internal_name]}\t{pet.name}{pin}',
-                    value=value + colorize(pet.rarity.upper(), RARITY_COLORS[pet.rarity])
-                )
-            
-            await embed.send()
-            embed = Embed(channel)
+                    pin = '\t📌' if pet.active else ''
+                    embed.add_field(
+                        name=f'{PET_EMOJIS[pet.internal_name]}\t{pet.name}{pin}',
+                        value=value + colorize(pet.rarity.upper(), RARITY_COLORS[pet.rarity])
+                    )
+                
+                await embed.send()
+                embed = Embed(channel).set_thumbnail(url=player.avatar())
+        else:
+            embed.add_field(name=None, value='```❌ no pets found```')
 
     async def guild(self, message, *args):
         user = message.author
@@ -1467,7 +1468,7 @@ class Bot(discord.Client):
             title='Success!'
         )
         for route, color in zip(best_route, [GRAY, GREEN, BLUE, RED, YELLOW]):
-            route = route if route.counts else r'```¯\_(ツ)_/¯```'
+            route = route if str(route) else r'```¯\_(ツ)_/¯```'
             
             embed.add_field(
                 name=f'**{route.rarity_str.title()}**',
