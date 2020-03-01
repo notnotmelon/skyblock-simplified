@@ -1172,6 +1172,9 @@ class Bot(discord.Client):
         except skypy.BadNameError:
             await channel.send(f'{user.mention} invalid guild!')
             return
+		except skypy.ExternalAPIError as e:
+			await channel.send(f'{user.mention} {e.reason}')
+			return
 
         await asyncio.gather(*[update_top_players(player) for player in guild])
 
@@ -1484,9 +1487,7 @@ class Bot(discord.Client):
 
         #print(*(f"({n} {v})" for n, v in locals().items()))
 
-        best, best_route, best_str, best_cc, best_cd = await self.loop.run_in_executor(
-            None,
-            optimizer,
+        best, best_route, best_str, best_cc, best_cd = optimizer(
             opt_goal,
             player, 
             weapon_damage, 
@@ -1928,7 +1929,7 @@ class Bot(discord.Client):
     async def api_disabled(self, title, channel):
         await Embed(
             channel,
-            title=f'{text}, your **{kind}** is disabled!{text_end}',
+            title=title,
             description='Re-enable them with [skyblock menu > settings > api settings]'
         ).set_footer(
             text='Sometimes this message appears even if your API settings are enabled. If so, exit Hypixel and try again. It\'s also possible that Hypixel\'s API servers are down'
