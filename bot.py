@@ -1468,13 +1468,18 @@ class Bot(discord.Client):
             title='Success!'
         )
         for route, color in zip(best_route, [GRAY, GREEN, BLUE, RED, YELLOW]):
-            route = route if str(route) else r'```¯\_(ツ)_/¯```'
-            
-            embed.add_field(
-                name=f'**{route.rarity_str.title()}**',
-                value=colorize(route, color),
-                inline=False
-            )
+            if str(route):
+                embed.add_field(
+                    name=f'**{route.rarity_str.title()}**',
+                    value=r'```¯\_(ツ)_/¯```',
+                    inline=False
+                )
+            else:
+                embed.add_field(
+                    name=f'**{route.rarity_str.title()}**',
+                    value=colorize(route, color),
+                    inline=False
+                )
         
         def emod(activity):
             result = 0
