@@ -15,6 +15,7 @@ from bs4 import BeautifulSoup
 import cloudscraper
 from aiohttp import ClientError
 import traceback
+import concurrent.futures
 
 TIME_FORMAT = '%m/%d %I:%M %p UTC'
 
@@ -49,7 +50,7 @@ DAMAGING_POTIONS = {
     },
     'strength': {
         'stats': {'strength': [0, 5.25, 13.125, 21, 31.5, 42, 52.5, 63, 78.75]},  # Assume cola
-        'levels': [0, 5, 7, 8]
+        'levels': [0, 5, 6, 7, 8]
     },
     'spirit': {
         'stats': {'crit damage': [0, 10, 20, 30, 40]},
@@ -374,6 +375,78 @@ def colorize(s, color):
         return f'```{language}\n{point}' + s.replace('\n', f'\n{point}') + '\n```'
     else:
         return ''
+
+def optimizer(player, weapon_damage, base_str, base_cc, base_cd):
+    best = 0
+    best_route = []
+    best_str = 0
+    best_cc = 0
+    best_cd = 0
+
+    stat_modifiers = player.stat_modifiers()
+    str_mod = stat_modifiers.get('strength', lambda x: x)
+    cc_mod = stat_modifiers.get('crit chance', lambda x: x)
+    cd_mod = stat_modifiers.get('crit damage', lambda x, y: x)
+
+    counts = player.talisman_counts()
+
+    if cc_mod(base_cc) <= 100:
+        cc_mod = stat_modifiers.get('crit chance', None)
+        if cc_mod:
+            for c, u, r, e, l in itertools.product(
+                    *[Route.routes(counts[key], 4, rarity_num) for rarity_num, key in enumerate(counts.keys())]):
+                crit_chance = cc_mod(
+                    base_cc + c.crit_chance + u.crit_chance + r.crit_chance + e.crit_chance + l.crit_chance) // 1
+                if crit_chance >= 100:
+                    strength = str_mod(base_str + c.strength + u.strength + r.strength + e.strength + l.strength)
+                    crit_damage = cd_mod(
+                        base_cd + c.crit_damage + u.crit_damage + r.crit_damage + e.crit_damage + l.crit_damage,
+                        strength)
+
+                    d = (5 + weapon_damage + strength // 5) * (1 + strength / 100) * (1 + crit_damage / 100)
+
+                    if d > best:
+                        best = d
+                        best_route = [c, u, r, e, l]
+                        best_str = strength
+                        best_cc = crit_chance
+                        best_cd = crit_damage
+        else:
+            for c, u, r, e, l in itertools.product(
+                    *[Route.routes(counts[key], 4, rarity_num) for rarity_num, key in enumerate(counts.keys())]):
+                crit_chance = base_cc + c.crit_chance + u.crit_chance + r.crit_chance + e.crit_chance + l.crit_chance
+                if crit_chance >= 100:
+                    strength = str_mod(base_str + c.strength + u.strength + r.strength + e.strength + l.strength)
+                    crit_damage = cd_mod(
+                        base_cd + c.crit_damage + u.crit_damage + r.crit_damage + e.crit_damage + l.crit_damage,
+                        strength)
+
+                    d = (5 + weapon_damage + strength // 5) * (1 + strength / 100) * (1 + crit_damage / 100)
+
+                    if d > best:
+                        best = d
+                        best_route = [c, u, r, e, l]
+                        best_str = strength
+                        best_cc = crit_chance
+                        best_cd = crit_damage
+    else:
+        for c, u, r, e, l in itertools.product(
+                *[Route.routes(counts[key], 4, rarity_num) for rarity_num, key in enumerate(counts.keys())]):
+            strength = str_mod(base_str + c.strength + u.strength + r.strength + e.strength + l.strength)
+            crit_damage = cd_mod(
+                base_cd + c.crit_damage + u.crit_damage + r.crit_damage + e.crit_damage + l.crit_damage, strength)
+
+            d = (5 + weapon_damage + strength // 5) * (1 + strength / 100) * (1 + crit_damage / 100)
+
+            if d > best:
+                best = d
+                best_route = [c, u, r, e, l]
+                best_str = strength
+                best_cc = cc_mod(
+                    base_cc + c.crit_chance + u.crit_chance + r.crit_chance + e.crit_chance + l.crit_chance)
+                best_cd = crit_damage
+                
+    return (best, best_route, best_str, best_cc, best_cd)
 
 class Route:
     def __init__(self, talismans, rarity):
@@ -1390,71 +1463,17 @@ class Bot(discord.Client):
         base_cc = stats['crit chance']
         base_cd = stats['crit damage']
 
-        counts = player.talisman_counts()
-
-        best = 0
-        best_route = []
-        best_str = 0
-        best_cc = 0
-        best_cd = 0
-
         #print(*(f"({n} {v})" for n, v in locals().items()))
 
-        if cc_mod(base_cc) <= 100:
-            cc_mod = stat_modifiers.get('crit chance', None)
-            if cc_mod:
-                for c, u, r, e, l in itertools.product(
-                        *[Route.routes(counts[key], 4, rarity_num) for rarity_num, key in enumerate(counts.keys())]):
-                    crit_chance = cc_mod(
-                        base_cc + c.crit_chance + u.crit_chance + r.crit_chance + e.crit_chance + l.crit_chance) // 1
-                    if crit_chance >= 100:
-                        strength = str_mod(base_str + c.strength + u.strength + r.strength + e.strength + l.strength)
-                        crit_damage = cd_mod(
-                            base_cd + c.crit_damage + u.crit_damage + r.crit_damage + e.crit_damage + l.crit_damage,
-                            strength)
-
-                        d = (5 + weapon_damage + strength // 5) * (1 + strength / 100) * (1 + crit_damage / 100)
-
-                        if d > best:
-                            best = d
-                            best_route = [c, u, r, e, l]
-                            best_str = strength
-                            best_cc = crit_chance
-                            best_cd = crit_damage
-            else:
-                for c, u, r, e, l in itertools.product(
-                        *[Route.routes(counts[key], 4, rarity_num) for rarity_num, key in enumerate(counts.keys())]):
-                    crit_chance = base_cc + c.crit_chance + u.crit_chance + r.crit_chance + e.crit_chance + l.crit_chance
-                    if crit_chance >= 100:
-                        strength = str_mod(base_str + c.strength + u.strength + r.strength + e.strength + l.strength)
-                        crit_damage = cd_mod(
-                            base_cd + c.crit_damage + u.crit_damage + r.crit_damage + e.crit_damage + l.crit_damage,
-                            strength)
-
-                        d = (5 + weapon_damage + strength // 5) * (1 + strength / 100) * (1 + crit_damage / 100)
-
-                        if d > best:
-                            best = d
-                            best_route = [c, u, r, e, l]
-                            best_str = strength
-                            best_cc = crit_chance
-                            best_cd = crit_damage
-        else:
-            for c, u, r, e, l in itertools.product(
-                    *[Route.routes(counts[key], 4, rarity_num) for rarity_num, key in enumerate(counts.keys())]):
-                strength = str_mod(base_str + c.strength + u.strength + r.strength + e.strength + l.strength)
-                crit_damage = cd_mod(
-                    base_cd + c.crit_damage + u.crit_damage + r.crit_damage + e.crit_damage + l.crit_damage, strength)
-
-                d = (5 + weapon_damage + strength // 5) * (1 + strength / 100) * (1 + crit_damage / 100)
-
-                if d > best:
-                    best = d
-                    best_route = [c, u, r, e, l]
-                    best_str = strength
-                    best_cc = cc_mod(
-                        base_cc + c.crit_chance + u.crit_chance + r.crit_chance + e.crit_chance + l.crit_chance)
-                    best_cd = crit_damage
+        best, best_route, best_str, best_cc, best_cd = await self.loop.run_in_executor(
+            None,
+            optimizer,
+            player, 
+            weapon_damage, 
+            base_str, 
+            base_cc,
+            base_cd
+        )
 
         if not best_route:
             await Embed(
@@ -1468,7 +1487,7 @@ class Bot(discord.Client):
             channel,
             title='Success!'
         )
-        for route, color in zip(best_route, [GRAY, GREEN, BLUE, RED, YELLOW]):
+        for route, color in zip(best_route, [GRAY, GREEN, BLUE, ORANGE, YELLOW]):
             if str(route):
                 embed.add_field(
                     name=f'**{route.rarity_str.title()}**',

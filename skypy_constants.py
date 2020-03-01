@@ -203,18 +203,176 @@ pet_xp = {
     ]
 }
 
-
-'''
 pet_stats = {
     'SKELETON_HORSE': {
         'name': 'Skeleton Horse', 
         'stats': {
-            'speed': lambda lvl: lvl // 10,
-            'strength': lambda lvl: lvl + 5
+        }
+    },
+    'SNOWMAN': {
+        'name': 'Snowman', 
+        'stats': {
+            'damage': lambda lvl: lvl // 3,
+            'strength': lambda lvl: lvl // 3,
+            'crit damage': lambda lvl: lvl // 3
+        }
+    },
+    'BAT': {
+        'name': 'Bat', 
+        'stats': {
+        }
+    },
+    'SHEEP': {
+        'name': 'Sheep', 
+        'stats': {
+        }
+    },
+    'CHICKEN': {
+        'name': 'Chicken', 
+        'stats': {
+        }
+    },
+    'WITHER_SKELETON': {
+        'name': 'Wither Skeleton', 
+        'stats': {
+            'strength': lambda lvl: lvl // 4,
+            'crit chance': lambda lvl: lvl // 20,
+            'crit damage': lambda lvl: lvl // 4
+        }
+    },
+    'SILVERFISH': {
+        'name': 'Silverfish', 
+        'stats': {
+        }
+    },
+    'RABBIT': {
+        'name': 'Rabbit', 
+        'stats': {
+        }
+    },
+    'HORSE': {
+        'name': 'Horse', 
+        'stats': {
+        }
+    },
+    'PIGMAN': {
+        'name': 'Pigman', 
+        'stats': {
+            'strength': lambda lvl: lvl // 2
+        } # lvl * 0.4 damage and lvl * 0.2 strength to Pigman Sword (All), Additional Damage lvl * 0.25% to mobs above lvl 100 (Slayers, Legendary)
+    },
+    'WOLF': {
+        'name': 'Wolf', 
+        'stats': {
+            'crit damage': lambda lvl: lvl // 10
+        }
+    },
+    'OCELOT': {
+        'name': 'Ocelot', 
+        'stats': {
+        }
+    },
+    'LION': {
+        'name': 'Lion', 
+        'stats': {
+            'damage': lambda lvl: lvl * 0.2,
+            'strength': lambda lvl: lvl // 2
+        } # First Strike lvl * 0.5% (Zealots, All), Additional Damage lvl * 0.3% to mobs below lvl 80 (Zealots, All)
+    },
+    'ENDER_DRAGON': {
+        'name': 'Ender Dragon', 
+        'stats': {
+            'strength': lambda lvl: lvl // 2,
+            'crit chance': lambda lvl: lvl // 10,
+            'crit damage': lambda lvl: lvl // 2
+        } # lvl * 0.5 damage and lvl * 0.3 strength to AotD (All), lvl * 0.1% stats boosts (Legendary)
+    },
+    'GUARDIAN': {
+        'name': 'Guardian', 
+        'stats': {
+        }
+    },
+    'ENDERMAN': {
+        'name': 'Enderman', 
+        'stats': {
+            'crit damage': lambda lvl: lvl * 0.75
+        }
+    },
+    'BLUE_WHALE': {
+        'name': 'Blue Whale', 
+        'stats': {
+        }
+    },
+    'GIRAFFE': {
+        'name': 'Giraffe', 
+        'stats': {
+            # No info :(
+        }
+    },
+    'PHOENIX': {
+        'name': 'Phoenix', 
+        'stats': {
+            'strength': lambda lvl: lvl // 2 + 10
+        }
+    },
+    'BEE': {
+        'name': 'Bee', 
+        'stats': {
+        }
+    },
+    'MAGMA_CUBE': {
+        'name': 'Magma Cube', 
+        'stats': {
+            'strength': lambda lvl: lvl // 5
+        } # Additonal Damage lvl * 0.25% to slimes (All), Ember Armor Stats boost lvl * 1% (Legendary)
+    },
+    'FLYING_FISH': {
+        'name': 'Flying Fish', 
+        'stats': {
+            'strength': lambda lvl: lvl // 2
+        } # Diver's Armor Stats boost lvl * 0.3% (Legendary)
+    },
+    'SQUID': {
+        'name': 'Squid', 
+        'stats': {
+        } # lvl * 0.4 Damage and lvl * 0.2 Strength to Ink Wand (Legendary)
+    },
+    'PARROT': {
+        'name': 'Parrot', 
+        'stats': {
+            'crit damage': lambda lvl: lvl // 10
+        } # lvl * 0.25 + 5 strength to nearby players (Legendary)
+    },
+    'TIGER': {
+        'name': 'Tiger', 
+        'stats': {
+            'strength': lambda lvl: lvl // 10 + 5,
+            'crit chance': lambda lvl: lvl // 20,
+            'crit damage': lambda lvl: lvl // 2
+        }
+    },
+    'TURTLE': {
+        'name': 'Turtle', 
+        'stats': {
+        }
+    },
+    'SPIDER': {
+        'name': 'Spider', 
+        'stats': {
+            # No info :(
+        }
+    },
+    'BLAZE': {
+        'name': 'Blaze', 
+        'stats': {
+        } # Blaze Armor Stats boost lvl * 0.4% (All), 2x Hot Potato Books (Legendary)
+    },
+    'JERRY': {
+        'name': 'Jerry', 
+        'stats': {
         }
     }
 }
-'''
 
 fairy_soul_hp_bonus = [3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 10, 11, 11, 12, 12, 13, 13, 14, 14, 15, 15, 16, 16,
                        17, 17, 18, 18, 19, 19, 20, 20, 21, 21]
