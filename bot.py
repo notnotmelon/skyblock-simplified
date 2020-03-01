@@ -331,7 +331,7 @@ PET_EMOJIS = {
 class Embed(discord.Embed):
     nbst = '\u200b'
 
-    def __init__(self, channel, *, **kwargs):
+    def __init__(self, channel, **kwargs):
         self.channel = channel
 
         super().__init__(
