@@ -1081,6 +1081,7 @@ class Bot(discord.Client):
                 embed = Embed(channel).set_thumbnail(url=player.avatar())
         else:
             embed.add_field(name=None, value='```❌ no pets found```')
+            embed.send()
 
     async def guild(self, message, *args):
         user = message.author
@@ -1471,13 +1472,13 @@ class Bot(discord.Client):
             if str(route):
                 embed.add_field(
                     name=f'**{route.rarity_str.title()}**',
-                    value=r'```¯\_(ツ)_/¯```',
+                    value=colorize(route, color),
                     inline=False
                 )
             else:
                 embed.add_field(
                     name=f'**{route.rarity_str.title()}**',
-                    value=colorize(route, color),
+                    value=r'```¯\_(ツ)_/¯```',
                     inline=False
                 )
         
