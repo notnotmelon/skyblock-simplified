@@ -672,9 +672,18 @@ class Player(ApiInterface):
 					runecrafting_xp_requirements if skill == 'runecrafting' else skill_xp_requirements
 				)
 		else:
+			self.enabled_api['skills'] = True
+			
+			self.skill_xp = {
+				'carpentry': 0,
+				'runecrafting': 0
+			}
 			self.skills = {
-				name: self.achievements.get(achievement, 0)
-				for name, achievement in [
+				'carpentry': 0,
+				'runecrafting': 0
+			}
+			
+			for skill, achievement in [
 					('farming', 'skyblock_harvester'),
 					('mining', 'skyblock_excavator'),
 					('foraging', 'skyblock_gatherer'),
@@ -682,15 +691,10 @@ class Player(ApiInterface):
 					('enchanting', 'skyblock_augmentation'),
 					('alchemy', 'skyblock_concoctor'),
 					('fishing', 'skyblock_angler')
-				]
-			}
-			
-			self.skill_xp = {skill: sum(skill_xp_requirements[:level]) for skill, level in self.skills.items()}
-			
-			self.skills['carpentry'] = 0
-			self.skills['runecrafting'] = 0
-			self.skill_xp['carpentry'] = 0
-			self.skill_xp['runecrafting'] = 0
+				]:
+				
+				self.skills[skill] = self.achievements.get(achievement, 0)
+				self.skill_xp[skill] = 0 if level is 0 else skill_xp_requirements[level - 1]
 
 		self.skill_average = sum(list(self.skills.values())[0:7]) / 7
 
