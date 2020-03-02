@@ -134,11 +134,13 @@ class Item:
 			rarity_type = self.description[-1].split()
 			self.rarity = rarity_type[0].lower()
 			self.type = rarity_type[1].lower() if len(rarity_type) > 1 else None
-			for type, list in {'sword': sword_enchants, 'bow': bow_enchants, 'fishing rod': rod_enchants}.items():
-				for e in list:
-					if e in self.enchantments:
-						self.type = type
-						break
+			
+			if self.internal_name != 'ENCHANTED_BOOK':
+				for type, list in {'sword': sword_enchants, 'bow': bow_enchants, 'fishing rod': rod_enchants}.items():
+					for e in list:
+						if e in self.enchantments:
+							self.type = type
+							break
 		else:
 			self.rarity = None
 			self.type = None

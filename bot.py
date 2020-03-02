@@ -894,25 +894,24 @@ class Bot(discord.Client):
 		auctions = [float(item['price']) * stacksize for item in sales]
 
 		size = len(auctions)
-		avg = mean(auctions)
-		std = pstdev(auctions, mu=avg)
-		small = min(auctions)
-		big = max(auctions)
-
-		cutoff = std * 1.5
-		lower, upper = avg - cutoff, avg + cutoff
-		auctions = [a for a in auctions if lower < a < upper]
-
-		try:
-			avg = mean(auctions)
-			mid = median(auctions)
-			common = mode(auctions)
-			std = pstdev(auctions, mu=avg)
-			cutoff = std * 1.5
-			steals = [a for a in auctions if a < avg - cutoff]
-		except StatisticsError:
+		if size == 0:
 			await channel.send(f'{user.mention} there haven\'t been any `{itemname}` sold recently')
 			return
+			
+		avg = mean(auctions)
+		upper = avg * 10
+		
+		auctions = [a for a in auctions if a < upper]
+		
+		avg = mean(auctions)
+		lower = avg * 0.10
+		
+		steals = [a for a in auctions if lower >= a]
+		auctions = [a for a in auctions if lower < a]
+		
+		mid = median(auctions)
+		common = mode(auctions)
+		std = pstdev(auctions, mu=avg)
 
 		await Embed(
 			channel,
@@ -923,7 +922,7 @@ class Bot(discord.Client):
 			value=f'```Average: {avg:,.0f}\nMedian: {mid:,.0f}\nMode: {common:,.0f}\nStandard Deviation: {std:,.0f}\nMin: {math.ceil(small):,}\nMax: {math.ceil(big):,}```'
 				  f'```There were {len(steals)} steals and {size} total sales```'
 		).set_footer(
-			text='Statistics are from the last 1500 items sold\nPrices are ignored unless they are within 1.5 standard deviations'
+			text='Statistics are from the last 1500 items sold if possible\nPrices ignored if they are 10 times larger or smaller than the average'
 		).send()
 
 	async def sells(self, message, *args):
@@ -1071,6 +1070,8 @@ class Bot(discord.Client):
 		await update_top_players(player)
 
 		api_header = ' '.join(f'{k.capitalize()} {"✅" if v else "❌"}' for k, v in player.enabled_api.items())
+		pet = player.pet
+		pet_line = f'\nPet > {pet.title} |{pet.rarity.upper()}|' if pet else ''
 
 		embed = Embed(
 			channel,
@@ -1080,8 +1081,7 @@ class Bot(discord.Client):
 						f'Deaths > {player.deaths}\n'
 						f'Guild > {player.guild}\n'
 						f'Money > {player.bank_balance + player.purse:,.0f}\n'
-						f'Slots > {player.minion_slots} ({player.unique_minions} crafts)\n'
-						f'Pet > {player.pet.title if player.pet else None}```'
+						f'Slots > {player.minion_slots} ({player.unique_minions} crafts){pet_line}```'
 		).set_thumbnail(
 			url=player.avatar()
 		)
@@ -1333,7 +1333,7 @@ class Bot(discord.Client):
 					await channel.send(f'Invalid profile! Did you make a typo?{CLOSE_MESSAGE}')
 
 		if player.enabled_api['skills'] is False or player.enabled_api['inventory'] is False:
-			await self.api_disabled(f'{user.name}, you have your API disabled!', channel)
+			await self.api_disabled(f'{user.name}, your API is disabled!', channel)
 			return
 		
 		if len(player.weapons) == 0:
@@ -1441,7 +1441,7 @@ class Bot(discord.Client):
 			title='You are almost done!'
 		).add_field(
 			name='What would you like to optimize for?',
-			value='\n'.join(f'> {emoji}\n`{value}`' for emoji, value in optimizers)
+			value='\n\n'.join(f'> {emoji}\n`{value}`' for emoji, value in optimizers)
 		)
 
 		optimizers = {emoji: index for index, (emoji, _) in enumerate(optimizers)}
