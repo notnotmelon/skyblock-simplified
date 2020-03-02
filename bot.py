@@ -898,6 +898,7 @@ class Bot(discord.Client):
 			await channel.send(f'{user.mention} there haven\'t been any `{itemname}` sold recently')
 			return
 			
+		small, big = min(auctions), max(auctions)
 		avg = mean(auctions)
 		upper = avg * 10
 		
