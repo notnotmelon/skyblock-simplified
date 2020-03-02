@@ -83,44 +83,44 @@ LEADERBOARDS = {
 	'Minion Slots': ('⛓', lambda player: player.unique_minions, lambda player: player.minion_slots,
 					 lambda guild: guild.stat_average('unique_minions'),
 					 lambda guild: guild.stat_average('minion_slots')),
-	'Farming': ('🌾', lambda player: player.skill_experience['farming'], lambda player: player.skills['farming'],
-				lambda guild: guild.stat_average('skill_experience')['farming'],
+	'Farming': ('🌾', lambda player: player.skill_xp['farming'], lambda player: player.skills['farming'],
+				lambda guild: guild.stat_average('skill_xp')['farming'],
 				lambda guild: guild.stat_average('skills')['farming']),
-	'Mining': ('⛏', lambda player: player.skill_experience['mining'], lambda player: player.skills['mining'],
-			   lambda guild: guild.stat_average('skill_experience')['mining'],
+	'Mining': ('⛏', lambda player: player.skill_xp['mining'], lambda player: player.skills['mining'],
+			   lambda guild: guild.stat_average('skill_xp')['mining'],
 			   lambda guild: guild.stat_average('skills')['mining']),
-	'Combat': ('⚔', lambda player: player.skill_experience['combat'], lambda player: player.skills['combat'],
-			   lambda guild: guild.stat_average('skill_experience')['combat'],
+	'Combat': ('⚔', lambda player: player.skill_xp['combat'], lambda player: player.skills['combat'],
+			   lambda guild: guild.stat_average('skill_xp')['combat'],
 			   lambda guild: guild.stat_average('skills')['combat']),
-	'Foraging': ('🪓', lambda player: player.skill_experience['foraging'], lambda player: player.skills['foraging'],
-				 lambda guild: guild.stat_average('skill_experience')['foraging'],
+	'Foraging': ('🪓', lambda player: player.skill_xp['foraging'], lambda player: player.skills['foraging'],
+				 lambda guild: guild.stat_average('skill_xp')['foraging'],
 				 lambda guild: guild.stat_average('skills')['foraging']),
 	'Enchanting': (
-		'📖', lambda player: player.skill_experience['enchanting'], lambda player: player.skills['enchanting'],
-		lambda guild: guild.stat_average('skill_experience')['enchanting'],
+		'📖', lambda player: player.skill_xp['enchanting'], lambda player: player.skills['enchanting'],
+		lambda guild: guild.stat_average('skill_xp')['enchanting'],
 		lambda guild: guild.stat_average('skills')['enchanting']),
-	'Alchemy': ('⚗', lambda player: player.skill_experience['alchemy'], lambda player: player.skills['alchemy'],
-				lambda guild: guild.stat_average('skill_experience')['alchemy'],
+	'Alchemy': ('⚗', lambda player: player.skill_xp['alchemy'], lambda player: player.skills['alchemy'],
+				lambda guild: guild.stat_average('skill_xp')['alchemy'],
 				lambda guild: guild.stat_average('skills')['alchemy']),
-	'Fishing': ('🎣', lambda player: player.skill_experience['fishing'], lambda player: player.skills['fishing'],
-				lambda guild: guild.stat_average('skill_experience')['carpentry'],
+	'Fishing': ('🎣', lambda player: player.skill_xp['fishing'], lambda player: player.skills['fishing'],
+				lambda guild: guild.stat_average('skill_xp')['carpentry'],
 				lambda guild: guild.stat_average('skills')['carpentry']),
-	'Carpentry': ('🪑', lambda player: player.skill_experience['carpentry'], lambda player: player.skills['carpentry'],
-				  lambda guild: guild.stat_average('skill_experience')['farming'],
+	'Carpentry': ('🪑', lambda player: player.skill_xp['carpentry'], lambda player: player.skills['carpentry'],
+				  lambda guild: guild.stat_average('skill_xp')['farming'],
 				  lambda guild: guild.stat_average('skills')['farming']),
 	'Runecrafting': (
-		'⚜️', lambda player: player.skill_experience['runecrafting'], lambda player: player.skills['runecrafting'],
-		lambda guild: guild.stat_average('skill_experience')['runecrafting'],
+		'⚜️', lambda player: player.skill_xp['runecrafting'], lambda player: player.skills['runecrafting'],
+		lambda guild: guild.stat_average('skill_xp')['runecrafting'],
 		lambda guild: guild.stat_average('skills')['runecrafting']),
-	'Zombie': ('🧟', lambda player: player.slayer_exp['zombie'], lambda player: player.slayer_levels['zombie'],
-			   lambda guild: guild.stat_average('slayer_exp')['zombie'],
-			   lambda guild: guild.stat_average('slayer_levels')['zombie']),
-	'Spider': ('🕸️', lambda player: player.slayer_exp['spider'], lambda player: player.slayer_levels['spider'],
-			   lambda guild: guild.stat_average('slayer_exp')['spider'],
-			   lambda guild: guild.stat_average('slayer_levels')['spider']),
-	'Wolf': ('🐺', lambda player: player.slayer_exp['wolf'], lambda player: player.slayer_levels['wolf'],
-			 lambda guild: guild.stat_average('slayer_exp')['wolf'],
-			 lambda guild: guild.stat_average('slayer_levels')['wolf'])
+	'Zombie': ('🧟', lambda player: player.slayer_xp['zombie'], lambda player: player.slayers['zombie'],
+			   lambda guild: guild.stat_average('slayer_xp')['zombie'],
+			   lambda guild: guild.stat_average('slayers')['zombie']),
+	'Spider': ('🕸️', lambda player: player.slayer_xp['spider'], lambda player: player.slayers['spider'],
+			   lambda guild: guild.stat_average('slayer_xp')['spider'],
+			   lambda guild: guild.stat_average('slayers')['spider']),
+	'Wolf': ('🐺', lambda player: player.slayer_xp['wolf'], lambda player: player.slayers['wolf'],
+			 lambda guild: guild.stat_average('slayer_xp')['wolf'],
+			 lambda guild: guild.stat_average('slayers')['wolf'])
 }
 
 LEVELS = {
@@ -1110,14 +1110,27 @@ class Bot(discord.Client):
 			url=player.avatar()
 		)
 
+		def percent_to_max(current, activity):
+			if activity == 'runecrafting':
+				return 100 * min(1, current / skypy.runecrafting_xp_requirements[-1])
+			
+			if activity in ('zombie', 'spider', 'wolf'):
+				return 100 * min(1, current / skypy.slayer_level_requirements[activity][-1])
+				
+			return 100 * min(1, current / skypy.skill_xp_requirements[-1])
+
 		for name, (emoji, function, optional_function, _, _) in LEVELS.items():
+			current = function(player)
+			percent = percent_to_max(current, name.lower())
+			percent_line = '' if percent == 100 else f'\n{percent:.1f}% maxed'
+		
 			embed.add_field(
 				name=f'{emoji}\t{name}',
-				value=f'```Level > {optional_function(player)}\nxp: {function(player):,}```'
+				value=f'```Level > {optional_function(player)}\nxp: {current:,}{percent_line}```'
 			)
 
 		if player.uuid in EXPLOITERS:
-			embed.add_field(name="Cheater", value=f'***Player has bug abused or excessively macroed skill(s)**', inline=True)
+			embed.add_field(name='Cheater', value=f'***Player has bug abused or excessively macroed skill(s)**', inline=True)
 			
 		await embed.send()
 		
@@ -1710,7 +1723,7 @@ class Bot(discord.Client):
 
 		embed = Embed(
 			channel,
-			title=f'{player.uname}, you are missing {len(talismans)} talisman{"" if len(talismans) == 1 else "s"}!',
+			title=f'{user.name}, you are missing {len(talismans)}/{len(skypy_constants.talismen)} talisman{"" if len(talismans) == 1 else "s"}!',
 			description='Only counting talismans in your bag or inventory'
 		)
 

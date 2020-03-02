@@ -109,6 +109,16 @@ def decode_inventory_data(raw):
 	parse_next_tag(root)
 	return [Item(x, i) for i, x in enumerate(root['i']) if x]
 
+def level_from_xp_table(xp, table):
+	"""Takes a list of xp requirements and a xp value.
+	Returns whatever level the thing should be at"""
+	
+	for level, requirement in enumerate(table):
+		if requirement > xp:
+			break
+	else:
+		level += 1
+	return level
 
 class Item:
 	def __init__(self, nbt, slot_number):
@@ -270,17 +280,9 @@ class Pet:
 		cls.active = data.get('active', False)
 		cls.rarity = data.get('tier', 'COMMON').lower()
 		cls.internal_name = data.get('type', 'BEE')
-		
-		for level, requirement in enumerate(pet_xp[cls.rarity]):
-			if requirement > cls.xp:
-				break
-		else:
-			level += 1
-		cls.level = level
-		
+		cls.level = level_from_xp_table(cls.xp, pet_xp[cls.rarity])
 		cls.name = pet_stats[cls.internal_name]['name']
 		cls.title = f'[Lvl {cls.level}] {cls.name}'
-		
 		cls.xp_remaining = pet_xp[cls.rarity][-1] - cls.xp
 		
 		return cls
@@ -467,7 +469,7 @@ class Guild(ApiInterface):
 				await player.set_profile(profile)
 			except HypixelInternalError:
 				continue
-			if player.total_slayer_exp >= 10000:
+			if player.total_slayer_xp >= 10000:
 				break
 
 class Player(ApiInterface):
@@ -522,10 +524,10 @@ class Player(ApiInterface):
 		else:
 			return f'https://mc-heads.net/avatar/{self.uuid}'
 
-	async def set_profile_automatically(self, attribute=lambda player: player.total_slayer_exp):
+	async def set_profile_automatically(self, attribute=lambda player: player.total_slayer_xp):
 		"""Sets a player profile automatically
 		<attribute> is a function that takes a <Player> class and returns whatever value you want to set it based on
-		example: player.set_profile_automatically(lambda player: player.skill_experience['combat'])"""
+		example: player.set_profile_automatically(lambda player: player.skill_xp['combat'])"""
 		best = None
 		max = 0
 		
@@ -606,11 +608,7 @@ class Player(ApiInterface):
 			sum(self.minions.values())
 		)
 
-		for slots, req in enumerate(minion_slot_requirements):
-			if self.unique_minions < req:
-				break
-				
-		self.minion_slots = slots
+		self.minion_slots = level_from_xp_table(self.unique_minions, minion_slot_requirements)
 
 		def optional_inv(*path):
 			try:
@@ -661,34 +659,18 @@ class Player(ApiInterface):
 							   for name, amount in v['stats'].items() if re.match('deaths_', name)}
 
 		if 'experience_skill_farming' in v:
-			def parse_skill(skill):
-				try:
-					return int(v['experience_skill_' + skill])
-				except KeyError:
-					return 0
-
-			self.skill_experience = {
-				name: parse_skill(name)
-				for name in ['farming', 'mining', 'foraging', 'combat', 'enchanting', 'alchemy', 'fishing', 'carpentry',
-							 'runecrafting']
-			}
-		
 			self.enabled_api['skills'] = True
-		
-			def parse_exp(exp, runecrafting=False):
-				for lvl, requirement in enumerate(runecrafting_exp_requirements if runecrafting else skill_exp_requirements):
-					if exp >= requirement:
-						exp -= requirement
-					else:
-						break
-				else:
-					lvl += 1
-				return lvl
-
-			self.skills = {
-				name: parse_exp(parse_skill(name), name == 'runecrafting')
-				for name in ['farming', 'mining', 'foraging', 'combat', 'enchanting', 'alchemy', 'fishing', 'carpentry', 'runecrafting']
-			}
+			
+			self.skill_xp = {}
+			self.skills = {}
+			
+			for skill in ['farming', 'mining', 'foraging', 'combat', 'enchanting', 'alchemy', 'fishing', 'carpentry', 'runecrafting']:
+				xp = int(v.get(f'experience_skill_{skill}', 0))
+				self.skill_xp[skill] = xp
+				self.skills[skill] = level_from_xp_table(
+					xp,
+					runecrafting_xp_requirements if skill == 'runecrafting' else skill_xp_requirements
+				)
 		else:
 			self.skills = {
 				name: self.achievements.get(achievement, 0)
@@ -703,41 +685,30 @@ class Player(ApiInterface):
 				]
 			}
 			
-			self.skill_experience = {skill: sum(skill_exp_requirements[:level]) for skill, level in self.skills.items()}
+			self.skill_xp = {skill: sum(skill_xp_requirements[:level]) for skill, level in self.skills.items()}
 			
 			self.skills['carpentry'] = 0
 			self.skills['runecrafting'] = 0
-			self.skill_experience['carpentry'] = 0
-			self.skill_experience['runecrafting'] = 0
+			self.skill_xp['carpentry'] = 0
+			self.skill_xp['runecrafting'] = 0
 
 		self.skill_average = sum(list(self.skills.values())[0:7]) / 7
 
-		def parse_slayer_api(name):
-			try:
-				return int(list(v['slayer_bosses'][name]['claimed_levels'].keys())[-1].replace('level_', ''))
-			except (IndexError, KeyError):
-				return 0
-
-		self.slayer_levels = {
-			'zombie': parse_slayer_api('zombie'),
-			'spider': parse_slayer_api('spider'),
-			'wolf': parse_slayer_api('wolf')
-		}
-		
-		try:
-			self.slayer_exp = {name: v['slayer_bosses'][name]['xp'] for name in ('zombie', 'spider', 'wolf')}
-		except KeyError:
-			self.slayer_exp = {'zombie': 0, 'spider': 0, 'wolf': 0}
-		self.total_slayer_exp = sum(self.slayer_exp.values())
+		self.slayer_xp = {}
+		self.slayers = {}
+		for slayer in ['zombie', 'spider', 'wolf']:
+			xp = v.get('slayer_bosses', {}).get(slayer, {}).get('xp', 0)
+			self.slayer_xp[slayer] = xp
+			self.slayers[slayer] = level_from_xp_table(xp, slayer_level_requirements[slayer])
+			
+		self.total_slayer_xp = sum(self.slayer_xp.values())
 
 	async def is_online(self):
 		player_data = (await self.__call_api__('/player', name=self.uname))['player']
 		return player_data['lastLogout'] < player_data['lastLogin']
 
 	def base_stats(self):
-		return {'damage': 0, 'strength': 0, 'crit chance': 20, 'crit damage': 50, 'attack speed': 100, 'health': 100,
-				'defense': 0,
-				'speed': 100, 'intelligence': 0}
+		return base_stats
 
 	def fairy_soul_stats(self):
 		hp = 0
@@ -755,7 +726,7 @@ class Player(ApiInterface):
 
 	def slayer_stats(self):
 		stats = {}
-		for rewards, level in zip(list(slayer_rewards.values()), list(self.slayer_levels.values())):
+		for rewards, level in zip(list(slayer_rewards.values()), list(self.slayers.values())):
 			for i, (reward, amount) in enumerate(rewards):
 				if level > i and reward:
 					stats[reward] = stats.get(reward, 0) + amount
