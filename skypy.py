@@ -695,7 +695,7 @@ class Player(ApiInterface):
 				
 				level = self.achievements.get(achievement, 0)
 				self.skills[skill] = level
-				self.skill_xp[skill] = 0 if level is 0 else skill_xp_requirements[level - 1]
+				self.skill_xp[skill] = 0 if level == 0 else skill_xp_requirements[level - 1]
 
 		self.skill_average = sum(list(self.skills.values())[0:7]) / 7
 
