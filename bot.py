@@ -160,6 +160,30 @@ EXPLOITERS = {
 	'446dea472dd0494b89260421b9981d15': ('combat',)	   
 }
 
+PROFILE_EMOJIS = {
+	'Apple': '🍎',
+	'Banana': '🍌',
+	'Blueberry': '🔵',
+	'Coconut': '🥥',
+	'Cucumber': '🥒',
+	'Grapes': '🍇',
+	'Kiwi': '🥝',
+	'Lemon': '🍋',
+	'Lime': '🍏',
+	'Mango': '🥭',
+	'Orange': '🍊',
+	'Papaya': '🍈',
+	'Peach': '🍑',
+	'Pear': '🍐',
+	'Pineapple': '🍍',
+	'Pomegranate': '👛',
+	'Raspberry': '🍒',
+	'Strawberry': '🍓',
+	'Tomato': '🍅',
+	'Watermelon': '🍉',
+	'Zucchini': '🥬'
+}
+
 # list of all enchantment powers per level. can be a function or a number
 ENCHANTMENT_VALUES = {
 	# sword always
@@ -819,16 +843,16 @@ class Bot(discord.Client):
 
 			players = []
 			
-			cursor = lb.find().sort(current, -1).limit(50)
+			cursor = lb.find().sort(current, -1).limit(30)
 			
 			i = 0
 			if optional_function:
 				for d in await cursor.to_list(length=None):
-					players.append(f'#{str(i + 1).ljust(2)} {d["name"]} [{d[current + "_"]:.3f}] [{d[current]:,.3f}]')
+					players.append(f'#{str(i + 1).ljust(2)} {d["name"]} [{round(d[current + "_"], 3)}] [{d[current]:,.0f}]')
 					i += 1
 			else:
 				for d in await cursor.to_list(length=None):
-					players.append(f'#{str(i + 1).ljust(2)} {d["name"]} [{d[current]:,.3f}]')
+					players.append(f'#{str(i + 1).ljust(2)} {d["name"]} [{d[current]:,.0f}]')
 					i += 1
 
 			portion = len(players) / 30
@@ -860,6 +884,9 @@ class Bot(discord.Client):
 			return
 
 		if len(args) > 1 and args[-1].isdigit():
+			if len(args[-1]) > 20:
+				await channel.send(f'In what world would you need {args[-1]} of that???')
+				return
 			stacksize = int(args[-1])
 			itemname = ' '.join(args[:-1]).title()
 		else:
@@ -899,18 +926,14 @@ class Bot(discord.Client):
 			return
 			
 		small, big = min(auctions), max(auctions)
-		avg = mean(auctions)
-		upper = avg * 10
-		
-		auctions = [a for a in auctions if a < upper]
-		
-		avg = mean(auctions)
-		lower = avg * 0.10
+		mid = median(auctions)
+		lower, upper = mid / 10, mid * 10
 		
 		steals = [a for a in auctions if lower >= a]
-		auctions = [a for a in auctions if lower < a]
+		auctions = [a for a in auctions if lower < a < upper]
 		
 		mid = median(auctions)
+		avg = mean(auctions)
 		common = mode(auctions)
 		std = pstdev(auctions, mu=avg)
 
@@ -1309,29 +1332,21 @@ class Bot(discord.Client):
 		else:
 			embed = Embed(
 				channel,
-				title='Which profile do you want to use?',
-				description='Sorted by date created'
-			).add_field(
-				name=None,
-				value='\n\n'.join(player.profiles.keys())
+				title='Which profile would you like to use?',
+				description='**[Sorted by date created]**'
 			)
+			
+			for profile in player.profiles.keys():
+				embed.add_field(
+					name=f'**{profile}**',
+					value=f'```{PROFILE_EMOJIS[profile]}```',
+					inline=False
+				)
 
-			valid = False
-
-			while valid is False:
-				await embed.send()
-
-				msg = await self.respond(user, channel)
-				if msg is None:
-					return
-				msg = msg.content.capitalize()
-
-				if msg in player.profiles:
-					await player.set_profile(player.profiles[msg])
-					valid = True
-
-				else:
-					await channel.send(f'Invalid profile! Did you make a typo?{CLOSE_MESSAGE}')
+			result = await self.reaction_menu(await embed.send(), user, {PROFILE_EMOJIS[profile]: profile for profile in player.profiles.keys()})
+			if result is None:
+				return
+			await player.set_profile(player.profiles[result])
 
 		if player.enabled_api['skills'] is False or player.enabled_api['inventory'] is False:
 			await self.api_disabled(f'{user.name}, your API is disabled!', channel)
@@ -1711,8 +1726,7 @@ class Bot(discord.Client):
 		if inactive:
 			embed.add_field(
 				name=f'You also have {len(inactive)} unnecessary talismans',
-				value='```' + '\n'.join(map(str, inactive)) + '```'
-															  '```An unnecessary talisman is any talisman is\nduplicated or part of a talisman familiy```'
+				value='```' + '\n'.join(map(str, inactive)) + '``````An unnecessary talisman is any talisman is\nduplicated or part of a talisman family```'
 			)
 
 		await embed.send()
