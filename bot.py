@@ -1997,7 +1997,7 @@ class Bot(discord.Client):
 	async def support_server(self, message, *args):
 		await Embed(
 			message.channel,
-			user=user,
+			user=message.author,
 			title='Here\'s a link to my support server',
 			description='[https://discord.gg/8Wbh3p7]'
 		).set_footer(
