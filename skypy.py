@@ -1174,8 +1174,6 @@ class Item:
 		self.stack_size = self.__nbt__.get('Count', 1)
 		self.slot_number = slot_number
 		
-		self.active = True
-		
 		tag = nbt.get('tag', {})
 		extras = tag.get('ExtraAttributes', {})		
 		
