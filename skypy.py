@@ -1178,6 +1178,8 @@ class Item:
 		extras = tag.get('ExtraAttributes', {})		
 		
 		self.description = tag.get('display', {}).get('Lore', [])
+		self.description_clean = [re.sub('§.', '', line) for line in self.description]
+		self.description = '\n'.join(self.description)
 		self.internal_name = extras.get('id', None)
 		self.hot_potatos = extras.get('hot_potato_count', 0)
 		self.collection_date = extras.get('timestamp', '') # 'timestamp': '2/16/20 9:24 PM',
@@ -1185,8 +1187,8 @@ class Item:
 		self.enchantments = extras.get('enchantments', {})
 		self.reforge = extras.get('modifier', None)			
 			
-		if self.description:
-			rarity_type = self.description[-1].split()
+		if self.description_clean:
+			rarity_type = self.description_clean[-1].split()
 			self.rarity = rarity_type[0].lower()
 			self.type = rarity_type[1].lower() if len(rarity_type) > 1 else None
 			
@@ -1199,8 +1201,7 @@ class Item:
 		else:
 			self.rarity = None
 			self.type = None
-
-		self.description = '\n'.join(self.description)
+			
 		self.name = re.sub('§.', '', self['tag']['display']['Name'])
 
 	def __getitem__(self, name):
@@ -1240,7 +1241,7 @@ class Item:
 			'Intelligence)'
 			': \+(\d+).*'
 		)
-		for line in self.description:
+		for line in self.description_clean:
 			match = reg.match(line)
 			if match:
 				results[match[1].lower()] = int(match[2])
