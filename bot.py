@@ -870,7 +870,7 @@ class Bot(discord.Client):
 
 			players = []
 			
-			cursor = lb.find().sort(current, -1).limit(30)
+			cursor = lb.find().sort(current.title(), -1).limit(30)
 			
 			i = 0
 			if optional_function:
@@ -897,7 +897,7 @@ class Bot(discord.Client):
 				)
 		
 			msg = await embed.send()
-			current = await self.reaction_menu(msg, user, menu).title()
+			current = await self.reaction_menu(msg, user, menu)
 			if current is None:
 				break
 			await msg.delete()
@@ -1828,6 +1828,7 @@ class Bot(discord.Client):
 
 	async def stats(self, message, *args):
 		channel = message.channel
+		user = message.user
 
 		server_rankings = sorted(self.guilds, key=lambda guild: len(guild.members), reverse=True)[:10]
 		server_rankings = f'{"Top Servers".ljust(28)} | Users\n' + '\n'.join(
