@@ -1368,10 +1368,10 @@ class Bot(discord.Client):
 				return
 			await player.set_profile(player.profiles[result])
 
-		player.load_inventories().load_skills_slayers().load_misc().load_pet()
+		player.load_inventories().load_skills_slayers().load_misc().load_pets()
 
 		if player.enabled_api['skills'] is False or player.enabled_api['inventory'] is False:
-			await self.api_disabled(f'{user.name}, your API is disabled!', channel)
+			await self.api_disabled(f'{user.name}, your API is disabled!', channel, user)
 			return
 		
 		if len(player.weapons) == 0:
@@ -1733,7 +1733,7 @@ class Bot(discord.Client):
 		player.load_inventories()
 
 		if player.enabled_api['inventory'] is False:
-			await self.api_disabled(f'{player.uname}, your inventory API is disabled on {player.profile_name.title()}!', channel)
+			await self.api_disabled(f'{player.uname}, your inventory API is disabled on {player.profile_name.title()}!', channel, user)
 			return
 
 		talismans = skypy.talismans.copy()
@@ -1828,7 +1828,7 @@ class Bot(discord.Client):
 
 	async def stats(self, message, *args):
 		channel = message.channel
-		user = message.user
+		user = message.author
 
 		server_rankings = sorted(self.guilds, key=lambda guild: len(guild.members), reverse=True)[:10]
 		server_rankings = f'{"Top Servers".ljust(28)} | Users\n' + '\n'.join(
@@ -1959,7 +1959,7 @@ class Bot(discord.Client):
 
 	async def view_trending(self, message, *args):
 		channel = message.channel
-		user = message.user
+		user = message.author
 		
 		embed = Embed(
 			channel,
@@ -1984,7 +1984,7 @@ class Bot(discord.Client):
 
 		await embed.send()
 
-	async def api_disabled(self, title, channel):
+	async def api_disabled(self, title, channel, user):
 		await Embed(
 			channel,
 			user=user,
