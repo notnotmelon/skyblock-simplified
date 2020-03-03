@@ -1368,7 +1368,7 @@ class Bot(discord.Client):
 				return
 			await player.set_profile(player.profiles[result])
 
-		player.load_inventories().load_skills_slayers().load_misc()
+		player.load_inventories().load_skills_slayers().load_misc().load_pet()
 
 		if player.enabled_api['skills'] is False or player.enabled_api['inventory'] is False:
 			await self.api_disabled(f'{user.name}, your API is disabled!', channel)
@@ -1411,7 +1411,7 @@ class Bot(discord.Client):
 						valid = True
 					except (IndexError, TypeError, ValueError):
 						await channel.send(f'Invalid weapon! Did you make a typo?{CLOSE_MESSAGE}')
-
+						
 		pet = player.pet
 
 		embed = Embed(
