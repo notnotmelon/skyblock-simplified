@@ -1423,7 +1423,7 @@ class Bot(discord.Client):
 			value=f'```{weapon.name}```',
 			inline=False
 		).add_field(
-			name=f'{PET_EMOJIS[pet.internal_name]}\tPet',
+			name=f'{PET_EMOJIS[pet.internal_name] if pet else PET_EMOJIS["OCELOT"]}\tPet',
 			value=f'```{format_pet(pet) if pet else None}```',
 			inline=False
 		)
