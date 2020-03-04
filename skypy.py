@@ -1055,7 +1055,7 @@ _session = None
 async def session():
 	global _session
 	if _session is None:
-		_session = aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=15), raise_for_status=True)
+		_session = aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=3), raise_for_status=True)
 	return _session
 
 # Inventory parsing
@@ -1287,7 +1287,7 @@ def damage(weapon_dmg, strength, crit_dmg, ench_modifier):
 #	def __init__(self, dict):
 #		self.
 
-async def fetch_uuid_uname(uname_or_uuid):
+async def fetch_uuid_uname(uname_or_uuid, _depth=0):
 	s = await session()
 	
 	class TryNormal(Exception):
@@ -1321,8 +1321,15 @@ async def fetch_uuid_uname(uname_or_uuid):
 				return json['name'], json['id']
 		except asyncio.TimeoutError:
 			raise ExternalAPIError('Could not connect to https://mc-heads.net') from None
-	except aiohttp.client_exceptions.ClientResponseError:
-		raise BadNameError('Malformed uuid or username') from None
+	except aiohttp.client_exceptions.ClientResponseError as e:
+		if e.status == 429:
+			await asyncio.sleep(15)
+			if _depth <= 5:
+				return fetch_uuid_uname(uname_or_uuid, _depth + 1)
+			else:
+				raise ExternalAPIError('You are being ratelimited by api.mojang.com') from None
+		else:
+			raise BadNameError('Malformed uuid or username') from None
 
 class Pet:
 	@staticmethod

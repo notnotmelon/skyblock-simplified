@@ -757,7 +757,7 @@ class Bot(discord.Client):
 
 		if session and channel in self.hot_channels:
 			await channel.send(
-				f'{user.mention} someone else is currently using me in this channel! Try sending me a dm with your command instead')
+				f'{user.mention} someone else is currently using me in this channel! Try sending me a DM with your command instead')
 			return
 
 		if security == 1 and not channel.permissions_for(user).administrator:
@@ -765,18 +765,34 @@ class Bot(discord.Client):
 				f'{user.mention} you do not have permission to use this command here! Try using it on your own discord server')
 			return
 
+		error = Embed(
+			channel,
+			user=user,
+			title='Error!'
+		).add_field(
+			name=None.
+			value='Something terrible happened while running your command\n'
+			'The error has been automatically reported to SBS devs'
+		)
+
 		await self.log(f'{user.name} used {name} {args} in {"a DM" if dm else channel.guild.name}')
 		if session:
 			self.hot_channels[channel] = user
 
 			try:
 				await function(message, *args)
-			except discord.errors.Forbidden:
-				await channel.send(f'{user.mention} your DM\'s are disabled')
+			except Exception as e:
+				error.send()
+				self.hot_channels.pop(channel)
+				raise e from None
 
 			self.hot_channels.pop(channel)
 		else:
-			await function(message, *args)
+			try:
+				await function(message, *args)
+			except Exception as e:
+				error.send()
+				raise e from None
 
 	async def args_to_player(self, user, channel, *args):
 		try:
@@ -857,9 +873,9 @@ class Bot(discord.Client):
 
 		menu = {emoji: name for name, (emoji, _, _) in LEADERBOARDS.items()}
 
-		current = 'Skill Average'
+		current = 'skill average'
 		while True:
-			emoji, function, optional_function = LEADERBOARDS[current]
+			emoji, function, optional_function = LEADERBOARDS[current.lower()]
 		
 			embed = Embed(
 				channel,
@@ -870,7 +886,7 @@ class Bot(discord.Client):
 
 			players = []
 			
-			cursor = lb.find().sort(current.title(), -1).limit(30)
+			cursor = lb.find().sort(current, -1).limit(30)
 			
 			i = 0
 			if optional_function:
@@ -897,7 +913,7 @@ class Bot(discord.Client):
 				)
 		
 			msg = await embed.send()
-			current = await self.reaction_menu(msg, user, menu)
+			current = await self.reaction_menu(msg, user, menu).title()
 			if current is None:
 				break
 			await msg.delete()
