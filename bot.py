@@ -782,7 +782,7 @@ class Bot(discord.Client):
 		try:
 			player = await skypy.Player(keys, uname=args[0], guild=True)
 			
-		except (skypy.BadNameError, skypy.NeverPlayedSkyblockError, Exception):
+		except (skypy.BadNameError, skypy.NeverPlayedSkyblockError):
 			await channel.send(f'{user.mention} invalid username!')
 			return None
 			
@@ -799,7 +799,7 @@ class Bot(discord.Client):
 				await channel.send(f'{user.mention} invalid profile!')
 				return None
 				
-		await update_top_players(player)
+		#await update_top_players(player)
 		
 		return player
 
