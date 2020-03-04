@@ -770,7 +770,7 @@ class Bot(discord.Client):
 			user=user,
 			title='Error!'
 		).add_field(
-			name=None.
+			name=None,
 			value='Something terrible happened while running your command\n'
 			'The error has been automatically reported to SBS devs'
 		)
