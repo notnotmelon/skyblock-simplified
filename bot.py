@@ -892,11 +892,11 @@ class Bot(discord.Client):
 			i = 0
 			if optional_function:
 				for d in await cursor.to_list(length=None):
-					players.append(f'#{str(i + 1).ljust(2)} {d["name"]} [{round(d[current + "_"], 3)}] [{d[current]:,.0f}]')
+					players.append(f'#{str(i + 1).ljust(2)} {d["name"]} [{round(d[current + "_"], 3)}] [{round(d[current], 3)}]')
 					i += 1
 			else:
 				for d in await cursor.to_list(length=None):
-					players.append(f'#{str(i + 1).ljust(2)} {d["name"]} [{d[current]:,.0f}]')
+					players.append(f'#{str(i + 1).ljust(2)} {d["name"]} [{round(d[current], 3)}]')
 					i += 1
 
 			portion = len(players) / 30
@@ -914,7 +914,7 @@ class Bot(discord.Client):
 				)
 		
 			msg = await embed.send()
-			current = await self.reaction_menu(msg, user, menu).title()
+			current = (await self.reaction_menu(msg, user, menu)).title()
 			if current is None:
 				break
 			await msg.delete()
@@ -1263,7 +1263,7 @@ class Bot(discord.Client):
 			lb = Embed(
 				channel,
 				user=user,
-				title=f'{guild.gname} {name} Leaderboard'
+				title=f'{guild.gname} {name.title()} Leaderboard'
 			)
 
 			if optional_function:
