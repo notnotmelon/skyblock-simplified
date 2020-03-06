@@ -1446,7 +1446,7 @@ class Guild(ApiInterface):
 		v = self.data
 		self.gname = v['name']
 		self.created = v['created']
-		self.gxp = v('exp', 0)
+		self.gxp = v.get('exp', 0)
 		self.tag = v.get('tag')
 		self.description = v.get('description')
 		

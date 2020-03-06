@@ -93,7 +93,7 @@ LEADERBOARDS = {
 	'zombie': ('🧟', lambda player: player.slayer_xp['zombie'], lambda player: player.slayers['zombie']),
 	'spider': ('🕸️', lambda player: player.slayer_xp['spider'], lambda player: player.slayers['spider']),
 	'wolf': ('🐺', lambda player: player.slayer_xp['wolf'], lambda player: player.slayers['wolf']),
-	'total slayer': ('', lambda player: player.total_slayer_xp, None)
+	'total slayer': ('☠️', lambda player: player.total_slayer_xp, None)
 }
 
 LEVELS = {name: LEADERBOARDS[name] for name in skypy.skills + skypy.slayers}
@@ -2119,7 +2119,7 @@ def update_trending():
 					thread['views'] = int(info.find(class_='minor').dd.string.replace(',', ''))
 					thread['replies'] = int(info.find(class_='major').dd.string.replace(',', ''))
 					thread['date'] = int(post.find(class_='posterDate muted').find('abbr')['data-time'])
-
+	
 					if now is None:
 						now = thread['date']
 
