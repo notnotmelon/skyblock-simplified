@@ -92,7 +92,8 @@ LEADERBOARDS = {
 	'runecrafting': ('⚜️', lambda player: player.skill_xp['runecrafting'], lambda player: player.skills['runecrafting']),
 	'zombie': ('🧟', lambda player: player.slayer_xp['zombie'], lambda player: player.slayers['zombie']),
 	'spider': ('🕸️', lambda player: player.slayer_xp['spider'], lambda player: player.slayers['spider']),
-	'wolf': ('🐺', lambda player: player.slayer_xp['wolf'], lambda player: player.slayers['wolf'])
+	'wolf': ('🐺', lambda player: player.slayer_xp['wolf'], lambda player: player.slayers['wolf']),
+	'total slayer': ('', lambda player: player.total_slayer_xp, None)
 }
 
 LEVELS = {name: LEADERBOARDS[name] for name in skypy.skills + skypy.slayers}
@@ -873,7 +874,7 @@ class Bot(discord.Client):
 
 		menu = {emoji: name for name, (emoji, _, _) in LEADERBOARDS.items()}
 
-		current = 'skill average'
+		current = 'Skill Average'
 		while True:
 			emoji, function, optional_function = LEADERBOARDS[current.lower()]
 		
